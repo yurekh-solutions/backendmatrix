@@ -183,7 +183,7 @@ const supplierSchema = new Schema<ISupplier>({
 });
 
 // Index for faster queries
-supplierSchema.index({ email: 1 });
+// Note: email index is automatically created by unique: true
 supplierSchema.index({ status: 1 });
 
 export default mongoose.model<ISupplier>('Supplier', supplierSchema);

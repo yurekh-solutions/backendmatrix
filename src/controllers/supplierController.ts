@@ -168,6 +168,7 @@ export const checkApplicationStatus = async (req: Request, res: Response) => {
       exists: true,
       data: {
         status: supplier.status,
+        email: supplier.email,
         companyName: supplier.companyName,
         submittedAt: supplier.submittedAt,
         rejectionReason: supplier.rejectionReason,
