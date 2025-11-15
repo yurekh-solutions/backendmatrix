@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin';
 import productRoutes from './routes/product';
 import rfqRoutes from './routes/rfq';
 import trackingRoutes from './routes/tracking';
+import categoryRoutes from './routes/category';
 
 // Load environment variables
 dotenv.config();
@@ -26,14 +27,17 @@ app.use(cors({
     'http://localhost:8080',
     'http://localhost:8081', 
     'http://localhost:3002',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
     'https://backendmatrix.onrender.com',
     'https://admin-panel-ritzyard.vercel.app',
-    // Add supplier portal URL when deployed
-    // 'https://your-supplier-portal.vercel.app'
+    'https://supplierportal.vercel.app',
+    'https://supplierportal-yurekh-solutions.vercel.app'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
 app.use(express.json());
@@ -66,6 +70,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api/tracking', trackingRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

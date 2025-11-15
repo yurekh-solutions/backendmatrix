@@ -4,11 +4,14 @@ export interface IProduct extends Document {
   supplierId: mongoose.Types.ObjectId;
   name: string;
   category: string;
+  subcategory?: string;
+  customCategory?: string;
+  customSubcategory?: string;
   description: string;
-  image: string;
-  applications: string[];
-  features: string[];
-  specifications: {
+  image?: string;
+  applications?: string[];
+  features?: string[];
+  specifications?: {
     materialStandard?: string;
     packaging?: string;
     testingCertificate?: string;
@@ -19,18 +22,19 @@ export interface IProduct extends Document {
     availability?: string;
     [key: string]: string | string[] | undefined;
   };
-  price: {
+  price?: {
     amount: number;
     currency: string;
     unit: string;
   };
-  images: string[];
-  stock: {
+  images?: string[];
+  stock?: {
     available: boolean;
     quantity?: number;
     minimumOrder?: number;
   };
   status: 'active' | 'inactive' | 'pending' | 'rejected';
+  rejectionReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,13 +55,21 @@ const ProductSchema = new Schema<IProduct>(
       type: String,
       required: true,
     },
+    subcategory: {
+      type: String,
+    },
+    customCategory: {
+      type: String,
+    },
+    customSubcategory: {
+      type: String,
+    },
     description: {
       type: String,
       required: true,
     },
     image: {
       type: String,
-      required: true,
     },
     applications: [String],
     features: [String],
@@ -72,9 +84,9 @@ const ProductSchema = new Schema<IProduct>(
       availability: String,
     },
     price: {
-      amount: { type: Number, required: true },
+      amount: { type: Number, default: 0 },
       currency: { type: String, default: 'INR' },
-      unit: { type: String, required: true },
+      unit: { type: String, default: 'unit' },
     },
     images: [String],
     stock: {
@@ -86,6 +98,9 @@ const ProductSchema = new Schema<IProduct>(
       type: String,
       enum: ['active', 'inactive', 'pending', 'rejected'],
       default: 'pending',
+    },
+    rejectionReason: {
+      type: String,
     },
   },
   { timestamps: true }

@@ -1,14 +1,68 @@
 import { Request, Response } from 'express';
 import Product from '../models/Product';
+import Category from '../models/Category';
 import { AuthRequest } from '../middleware/auth';
 
 // Supplier: Add new product
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
     const supplierId = req.supplier._id;
+    const { name, category, subcategory, customCategory, customSubcategory, description } = req.body;
+
+    // Handle image upload
+    let imageUrl = '';
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`;
+    }
+
+    // Handle custom category request
+    if (customCategory) {
+      const slug = customCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const existingCategory = await Category.findOne({ slug });
+      
+      if (!existingCategory) {
+        // Create new category request
+        await Category.create({
+          name: customCategory,
+          slug,
+          isCustom: true,
+          requestedBy: supplierId,
+          status: 'pending',
+          isActive: false,
+        });
+      }
+    }
+
+    // Handle custom subcategory request
+    if (customSubcategory && category) {
+      const categoryDoc = await Category.findOne({ slug: category });
+      if (categoryDoc) {
+        const subSlug = customSubcategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const existingSub = categoryDoc.subcategories.find((sub: any) => sub.slug === subSlug);
+        
+        if (!existingSub) {
+          categoryDoc.subcategories.push({
+            name: customSubcategory,
+            slug: subSlug,
+            isCustom: true,
+            requestedBy: supplierId,
+            status: 'pending',
+            isActive: false,
+          } as any);
+          await categoryDoc.save();
+        }
+      }
+    }
+
     const productData = {
-      ...req.body,
       supplierId,
+      name,
+      category,
+      subcategory,
+      customCategory,
+      customSubcategory,
+      description,
+      image: imageUrl,
       status: 'pending', // Admin approval required
     };
 
@@ -20,10 +74,11 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       message: 'Product added successfully. Awaiting admin approval.',
       data: product,
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Add product error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to add product',
+      message: error.message || 'Failed to add product',
     });
   }
 };

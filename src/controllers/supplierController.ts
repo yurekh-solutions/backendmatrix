@@ -4,6 +4,10 @@ import path from 'path';
 
 export const submitOnboarding = async (req: Request, res: Response) => {
   try {
+    console.log('📥 Received onboarding submission');
+    console.log('📋 Request body:', req.body);
+    console.log('📎 Files received:', Object.keys(req.files || {}));
+    
     const {
       companyName,
       email,
@@ -16,9 +20,19 @@ export const submitOnboarding = async (req: Request, res: Response) => {
       yearsInBusiness
     } = req.body;
     
+    // Validate required fields
+    if (!companyName || !email || !phone || !contactPerson) {
+      console.error('❌ Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: companyName, email, phone, contactPerson'
+      });
+    }
+    
     // Check if supplier already exists
     const existingSupplier = await Supplier.findOne({ email });
     if (existingSupplier && existingSupplier.status === 'approved') {
+      console.log('⚠️ Supplier already exists and approved:', email);
       return res.status(400).json({
         success: false,
         message: 'A supplier with this email is already registered and approved'
@@ -92,6 +106,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
     let supplier;
     if (existingSupplier) {
       // Update existing (for reapplication)
+      console.log('🔄 Updating existing supplier application:', email);
       supplier = await Supplier.findByIdAndUpdate(
         existingSupplier._id,
         {
@@ -113,6 +128,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
       );
     } else {
       // Create new supplier
+      console.log('✨ Creating new supplier application:', email);
       supplier = await Supplier.create({
         companyName,
         email,
@@ -128,13 +144,14 @@ export const submitOnboarding = async (req: Request, res: Response) => {
       });
     }
     
+    console.log('✅ Supplier application submitted successfully:', supplier._id);
     res.status(201).json({
       success: true,
       message: 'Supplier onboarding application submitted successfully',
       data: supplier
     });
   } catch (error: any) {
-    console.error('Onboarding error:', error);
+    console.error('❌ Onboarding error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to submit application'

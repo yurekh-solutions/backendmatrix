@@ -89,8 +89,8 @@ export const approveSupplier = async (req: AuthRequest, res: Response) => {
     }
     
     supplier.status = 'approved';
-    if (req.admin && req.admin._id) {
-      supplier.reviewedBy = req.admin._id;
+    if (req.admin) {
+      supplier.reviewedBy = req.admin._id || req.admin.id;
     }
     supplier.reviewedAt = new Date();
     supplier.rejectionReason = undefined;
@@ -134,8 +134,8 @@ export const rejectSupplier = async (req: AuthRequest, res: Response) => {
     
     supplier.status = 'rejected';
     supplier.rejectionReason = reason;
-    if (req.admin && req.admin._id) {
-      supplier.reviewedBy = req.admin._id;
+    if (req.admin) {
+      supplier.reviewedBy = req.admin._id || req.admin.id;
     }
     supplier.reviewedAt = new Date();
     
