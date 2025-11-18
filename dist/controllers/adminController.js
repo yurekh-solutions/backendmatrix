@@ -82,8 +82,8 @@ const approveSupplier = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Supplier already approved' });
         }
         supplier.status = 'approved';
-        if (req.admin && req.admin._id) {
-            supplier.reviewedBy = req.admin._id;
+        if (req.admin) {
+            supplier.reviewedBy = req.admin._id || req.admin.id;
         }
         supplier.reviewedAt = new Date();
         supplier.rejectionReason = undefined;
@@ -122,8 +122,8 @@ const rejectSupplier = async (req, res) => {
         }
         supplier.status = 'rejected';
         supplier.rejectionReason = reason;
-        if (req.admin && req.admin._id) {
-            supplier.reviewedBy = req.admin._id;
+        if (req.admin) {
+            supplier.reviewedBy = req.admin._id || req.admin.id;
         }
         supplier.reviewedAt = new Date();
         await supplier.save();

@@ -5,13 +5,61 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductById = exports.getAllProducts = exports.deleteProduct = exports.updateProduct = exports.getSupplierProducts = exports.addProduct = void 0;
 const Product_1 = __importDefault(require("../models/Product"));
+const Category_1 = __importDefault(require("../models/Category"));
 // Supplier: Add new product
 const addProduct = async (req, res) => {
     try {
         const supplierId = req.supplier._id;
+        const { name, category, subcategory, customCategory, customSubcategory, description } = req.body;
+        // Handle image upload
+        let imageUrl = '';
+        if (req.file) {
+            imageUrl = `/uploads/${req.file.filename}`;
+        }
+        // Handle custom category request
+        if (customCategory) {
+            const slug = customCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const existingCategory = await Category_1.default.findOne({ slug });
+            if (!existingCategory) {
+                // Create new category request
+                await Category_1.default.create({
+                    name: customCategory,
+                    slug,
+                    isCustom: true,
+                    requestedBy: supplierId,
+                    status: 'pending',
+                    isActive: false,
+                });
+            }
+        }
+        // Handle custom subcategory request
+        if (customSubcategory && category) {
+            const categoryDoc = await Category_1.default.findOne({ slug: category });
+            if (categoryDoc) {
+                const subSlug = customSubcategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const existingSub = categoryDoc.subcategories.find((sub) => sub.slug === subSlug);
+                if (!existingSub) {
+                    categoryDoc.subcategories.push({
+                        name: customSubcategory,
+                        slug: subSlug,
+                        isCustom: true,
+                        requestedBy: supplierId,
+                        status: 'pending',
+                        isActive: false,
+                    });
+                    await categoryDoc.save();
+                }
+            }
+        }
         const productData = {
-            ...req.body,
             supplierId,
+            name,
+            category,
+            subcategory,
+            customCategory,
+            customSubcategory,
+            description,
+            image: imageUrl,
             status: 'pending', // Admin approval required
         };
         const product = new Product_1.default(productData);
@@ -23,9 +71,10 @@ const addProduct = async (req, res) => {
         });
     }
     catch (error) {
+        console.error('Add product error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to add product',
+            message: error.message || 'Failed to add product',
         });
     }
 };

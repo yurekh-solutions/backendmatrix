@@ -34,67 +34,56 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const ProductSchema = new mongoose_1.Schema({
-    supplierId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'Supplier',
-        required: true,
-    },
+const SubcategorySchema = new mongoose_1.Schema({
+    name: { type: String, required: true },
+    slug: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+    isCustom: { type: Boolean, default: false },
+    requestedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Supplier' },
+    approvedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Admin' },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'approved'
+    }
+});
+const CategorySchema = new mongoose_1.Schema({
     name: {
         type: String,
         required: true,
+        unique: true,
         trim: true,
     },
-    category: {
+    slug: {
         type: String,
         required: true,
+        unique: true,
+        lowercase: true,
     },
-    subcategory: {
+    icon: {
         type: String,
     },
-    customCategory: {
-        type: String,
+    isActive: {
+        type: Boolean,
+        default: true,
     },
-    customSubcategory: {
-        type: String,
+    isCustom: {
+        type: Boolean,
+        default: false,
     },
-    description: {
-        type: String,
-        required: true,
+    requestedBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Supplier',
     },
-    image: {
-        type: String,
-    },
-    applications: [String],
-    features: [String],
-    specifications: {
-        materialStandard: String,
-        packaging: String,
-        testingCertificate: String,
-        brand: [String],
-        grades: [String],
-        delivery: String,
-        quality: String,
-        availability: String,
-    },
-    price: {
-        amount: { type: Number, default: 0 },
-        currency: { type: String, default: 'INR' },
-        unit: { type: String, default: 'unit' },
-    },
-    images: [String],
-    stock: {
-        available: { type: Boolean, default: true },
-        quantity: Number,
-        minimumOrder: Number,
+    approvedBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Admin',
     },
     status: {
         type: String,
-        enum: ['active', 'inactive', 'pending', 'rejected'],
-        default: 'pending',
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'approved',
     },
-    rejectionReason: {
-        type: String,
-    },
+    subcategories: [SubcategorySchema],
 }, { timestamps: true });
-exports.default = mongoose_1.default.model('Product', ProductSchema);
+exports.default = mongoose_1.default.model('Category', CategorySchema);

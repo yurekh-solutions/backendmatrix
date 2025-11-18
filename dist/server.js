@@ -16,6 +16,7 @@ const admin_1 = __importDefault(require("./routes/admin"));
 const product_1 = __importDefault(require("./routes/product"));
 const rfq_1 = __importDefault(require("./routes/rfq"));
 const tracking_1 = __importDefault(require("./routes/tracking"));
+const category_1 = __importDefault(require("./routes/category"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -23,10 +24,21 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 // CORS configuration with file upload support
 app.use((0, cors_1.default)({
-    origin: ['http://localhost:8080', 'http://localhost:8081', 'http://localhost:5173'],
+    origin: [
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:3002',
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'https://backendmatrix.onrender.com',
+        'https://admin-panel-ritzyard.vercel.app',
+        'https://supplierportal.vercel.app',
+        'https://supplierportal-yurekh-solutions.vercel.app'
+    ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
 app.use(express_1.default.json());
@@ -61,6 +73,7 @@ app.use('/api/admin', admin_1.default);
 app.use('/api/products', product_1.default);
 app.use('/api/rfqs', rfq_1.default);
 app.use('/api/tracking', tracking_1.default);
+app.use('/api/categories', category_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({

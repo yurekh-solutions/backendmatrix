@@ -39,13 +39,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const productController = __importStar(require("../controllers/productController"));
 const auth_1 = require("../middleware/auth");
+const multer_1 = require("../config/multer");
 const router = express_1.default.Router();
 // Public routes
 router.get('/public', productController.getAllProducts);
 router.get('/public/:id', productController.getProductById);
 // Supplier routes (protected)
-router.post('/', auth_1.supplierAuth, productController.addProduct);
+router.post('/', auth_1.supplierAuth, multer_1.upload.single('productImage'), productController.addProduct);
 router.get('/my-products', auth_1.supplierAuth, productController.getSupplierProducts);
-router.put('/:id', auth_1.supplierAuth, productController.updateProduct);
+router.put('/:id', auth_1.supplierAuth, multer_1.upload.single('productImage'), productController.updateProduct);
 router.delete('/:id', auth_1.supplierAuth, productController.deleteProduct);
 exports.default = router;
