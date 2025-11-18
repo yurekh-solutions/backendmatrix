@@ -34,6 +34,7 @@ app.use((0, cors_1.default)({
         'https://backendmatrix.onrender.com',
         'https://admin-panel-ritzyard.vercel.app',
         'https://supplierportal.vercel.app',
+        'https://supplierportal-mu.vercel.app',
         'https://supplierportal-yurekh-solutions.vercel.app'
     ],
     credentials: true,
