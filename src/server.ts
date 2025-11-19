@@ -13,6 +13,7 @@ import productRoutes from './routes/product';
 import rfqRoutes from './routes/rfq';
 import trackingRoutes from './routes/tracking';
 import categoryRoutes from './routes/category';
+import aiInsightsRoutes from './routes/aiInsights';
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +73,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/ai', aiInsightsRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
