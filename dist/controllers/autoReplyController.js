@@ -9,10 +9,13 @@ const createAutoReply = async (req, res) => {
     try {
         const { messageType, responseText, triggerKeywords } = req.body;
         const supplierId = req.supplier?._id;
+        console.log('🔔 Auto Reply Creation Request:', { messageType, responseText: responseText?.substring(0, 50), supplierId });
         if (!supplierId) {
+            console.log('❌ No supplier ID found');
             return res.status(401).json({ success: false, message: 'Supplier not authenticated' });
         }
         if (!messageType || !responseText) {
+            console.log('❌ Missing required fields:', { messageType, responseText });
             return res.status(400).json({ success: false, message: 'Message type and response text are required' });
         }
         if (responseText.length < 10 || responseText.length > 1000) {
@@ -21,6 +24,7 @@ const createAutoReply = async (req, res) => {
         // Check if auto-reply for this type already exists
         const existing = await AutoReply_1.default.findOne({ supplierId, messageType });
         if (existing) {
+            console.log('♻️ Updating existing auto-reply');
             // Update existing
             existing.responseText = responseText;
             existing.triggerKeywords = triggerKeywords || [];
@@ -41,6 +45,7 @@ const createAutoReply = async (req, res) => {
             isActive: true
         });
         await newAutoReply.save();
+        console.log('✅ Auto-reply created successfully:', newAutoReply._id);
         res.status(201).json({
             success: true,
             message: 'Auto-reply created successfully',
@@ -48,6 +53,8 @@ const createAutoReply = async (req, res) => {
         });
     }
     catch (error) {
+        console.error('❌ Error creating auto-reply:', error.message);
+        console.error('Full error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
