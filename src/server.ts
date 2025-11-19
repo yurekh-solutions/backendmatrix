@@ -17,6 +17,7 @@ import aiInsightsRoutes from './routes/aiInsights';
 import productEnrichmentRoutes from './routes/productEnrichment';
 import toolUsageRoutes from './routes/toolUsage';
 import toolFeaturesRoutes from './routes/toolFeatures';
+import autoReplyRoutes from './routes/autoReply';
 
 // Load environment variables
 dotenv.config();
@@ -80,6 +81,7 @@ app.use('/api/ai', aiInsightsRoutes);
 app.use('/api/enrich', productEnrichmentRoutes);
 app.use('/api/tools', toolUsageRoutes);
 app.use('/api/tool-features', toolFeaturesRoutes);
+app.use('/api/auto-replies', autoReplyRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
