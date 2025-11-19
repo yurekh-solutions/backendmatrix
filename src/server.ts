@@ -90,7 +90,35 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// 404 handler
+// Test email endpoint (for debugging)
+app.post('/api/test-email', async (req: Request, res: Response) => {
+  try {
+    const { email = 'test@example.com' } = req.body;
+    const { sendEmail } = await import('./config/email');
+    
+    const testHtml = `
+      <h2>Test Email from RitzYard</h2>
+      <p>This is a test email to verify the email system is working correctly.</p>
+      <p>If you received this, email notifications are configured properly!</p>
+      <p>Timestamp: ${new Date().toISOString()}</p>
+    `;
+    
+    const result = await sendEmail(email, 'RitzYard Test Email', testHtml);
+    
+    res.json({
+      success: result,
+      message: result ? 'Test email sent successfully' : 'Failed to send test email - check logs and .env configuration',
+      emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
+    });
+  }
+});
+// ... existing code ...
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,
