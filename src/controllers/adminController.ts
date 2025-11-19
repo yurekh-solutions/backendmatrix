@@ -247,7 +247,11 @@ export const rejectProduct = async (req: AuthRequest, res: Response) => {
   try {
     const { reason } = req.body;
     
-    const product = await Product.findById(req.params.id);
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+    }
+    
+    const product = await Product.findById(req.params.id).populate('supplierId', 'email companyName');
     
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
@@ -256,9 +260,30 @@ export const rejectProduct = async (req: AuthRequest, res: Response) => {
     product.status = 'rejected';
     await product.save();
     
+    // Send rejection email to supplier
+    try {
+      const supplier = product.supplierId as any;
+      if (supplier && supplier.email) {
+        const emailHtml = `
+          <h2>Product Rejection Notice</h2>
+          <p>Dear ${supplier.companyName},</p>
+          <p>Your product <strong>${product.name}</strong> has been reviewed and rejected.</p>
+          <h3>Rejection Reason:</h3>
+          <p>${reason}</p>
+          <p>Please review the feedback and resubmit your product with corrections.</p>
+          <p>If you have any questions, please contact our support team.</p>
+          <p>Best regards,<br/>RitzYard Admin Team</p>
+        `;
+        await sendEmail(supplier.email, `Product Rejected: ${product.name}`, emailHtml);
+      }
+    } catch (emailError) {
+      console.error('Failed to send product rejection email:', emailError);
+      // Don't fail the rejection if email fails
+    }
+    
     res.json({
       success: true,
-      message: 'Product rejected',
+      message: 'Product rejected and email sent to supplier',
       data: product
     });
   } catch (error: any) {

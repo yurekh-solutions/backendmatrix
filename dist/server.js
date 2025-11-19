@@ -20,6 +20,7 @@ const category_1 = __importDefault(require("./routes/category"));
 const aiInsights_1 = __importDefault(require("./routes/aiInsights"));
 const productEnrichment_1 = __importDefault(require("./routes/productEnrichment"));
 const toolUsage_1 = __importDefault(require("./routes/toolUsage"));
+const toolFeatures_1 = __importDefault(require("./routes/toolFeatures"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -81,6 +82,7 @@ app.use('/api/categories', category_1.default);
 app.use('/api/ai', aiInsights_1.default);
 app.use('/api/enrich', productEnrichment_1.default);
 app.use('/api/tools', toolUsage_1.default);
+app.use('/api/tool-features', toolFeatures_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
