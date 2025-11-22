@@ -41,7 +41,7 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-API-Key'],
   exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
 app.use(express.json());
@@ -68,6 +68,15 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 }));
 
 // Routes
+// Explicitly handle preflight requests for all routes
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/supplier', supplierRoutes);
 app.use('/api/admin', adminRoutes);
