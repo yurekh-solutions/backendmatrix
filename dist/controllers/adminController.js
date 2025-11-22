@@ -89,10 +89,11 @@ const approveSupplier = async (req, res) => {
         supplier.rejectionReason = undefined;
         await supplier.save();
         // Send approval email
+        let emailSent = false;
         try {
             const setupPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:8081'}/supplier/login`;
             const emailHtml = (0, emailTemplates_1.approvalEmailTemplate)(supplier.companyName, setupPasswordUrl);
-            await (0, email_1.sendEmail)(supplier.email, 'Supplier Application Approved - Setup Your Account', emailHtml);
+            emailSent = await (0, email_1.sendEmail)(supplier.email, 'Supplier Application Approved - Setup Your Account', emailHtml);
         }
         catch (emailError) {
             console.error('Failed to send approval email:', emailError);
@@ -100,8 +101,9 @@ const approveSupplier = async (req, res) => {
         }
         res.json({
             success: true,
-            message: 'Supplier approved successfully',
-            data: supplier
+            message: emailSent ? 'Supplier approved successfully and email sent' : 'Supplier approved successfully but email failed to send',
+            data: supplier,
+            emailSent
         });
     }
     catch (error) {
@@ -128,10 +130,11 @@ const rejectSupplier = async (req, res) => {
         supplier.reviewedAt = new Date();
         await supplier.save();
         // Send rejection email
+        let emailSent = false;
         try {
             const reapplyUrl = `${process.env.FRONTEND_URL || 'http://localhost:8081'}/supplier/onboarding`;
             const emailHtml = (0, emailTemplates_1.rejectionEmailTemplate)(supplier.companyName, reason, reapplyUrl);
-            await (0, email_1.sendEmail)(supplier.email, 'Supplier Application Update', emailHtml);
+            emailSent = await (0, email_1.sendEmail)(supplier.email, 'Supplier Application Update', emailHtml);
         }
         catch (emailError) {
             console.error('Failed to send rejection email:', emailError);
@@ -139,8 +142,9 @@ const rejectSupplier = async (req, res) => {
         }
         res.json({
             success: true,
-            message: 'Supplier rejected',
-            data: supplier
+            message: emailSent ? 'Supplier rejected and email sent' : 'Supplier rejected but email failed to send',
+            data: supplier,
+            emailSent
         });
     }
     catch (error) {

@@ -98,10 +98,11 @@ export const approveSupplier = async (req: AuthRequest, res: Response) => {
     await supplier.save();
     
     // Send approval email
+    let emailSent = false;
     try {
       const setupPasswordUrl = `${process.env.FRONTEND_URL || 'http://localhost:8081'}/supplier/login`;
       const emailHtml = approvalEmailTemplate(supplier.companyName, setupPasswordUrl);
-      await sendEmail(supplier.email, 'Supplier Application Approved - Setup Your Account', emailHtml);
+      emailSent = await sendEmail(supplier.email, 'Supplier Application Approved - Setup Your Account', emailHtml);
     } catch (emailError) {
       console.error('Failed to send approval email:', emailError);
       // Don't fail the approval if email fails
@@ -109,8 +110,9 @@ export const approveSupplier = async (req: AuthRequest, res: Response) => {
     
     res.json({
       success: true,
-      message: 'Supplier approved successfully',
-      data: supplier
+      message: emailSent ? 'Supplier approved successfully and email sent' : 'Supplier approved successfully but email failed to send',
+      data: supplier,
+      emailSent
     });
   } catch (error: any) {
     console.error('Error approving supplier:', error);
@@ -142,10 +144,11 @@ export const rejectSupplier = async (req: AuthRequest, res: Response) => {
     await supplier.save();
     
     // Send rejection email
+    let emailSent = false;
     try {
       const reapplyUrl = `${process.env.FRONTEND_URL || 'http://localhost:8081'}/supplier/onboarding`;
       const emailHtml = rejectionEmailTemplate(supplier.companyName, reason, reapplyUrl);
-      await sendEmail(supplier.email, 'Supplier Application Update', emailHtml);
+      emailSent = await sendEmail(supplier.email, 'Supplier Application Update', emailHtml);
     } catch (emailError) {
       console.error('Failed to send rejection email:', emailError);
       // Don't fail the rejection if email fails
@@ -153,8 +156,9 @@ export const rejectSupplier = async (req: AuthRequest, res: Response) => {
     
     res.json({
       success: true,
-      message: 'Supplier rejected',
-      data: supplier
+      message: emailSent ? 'Supplier rejected and email sent' : 'Supplier rejected but email failed to send',
+      data: supplier,
+      emailSent
     });
   } catch (error: any) {
     console.error('Error rejecting supplier:', error);
