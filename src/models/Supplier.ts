@@ -56,6 +56,15 @@ export interface ISupplier extends Document {
   productsOffered: string[];
   yearsInBusiness: number;
   
+  // Automation Suite Settings
+  automationSettings?: {
+    autoReplyEnabled: boolean;
+    leadScoringEnabled: boolean;
+    orderAutomationEnabled: boolean;
+    inventoryTrackingEnabled: boolean;
+    priceOptimizerEnabled: boolean;
+  };
+  
   // Status & Review
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
@@ -147,6 +156,13 @@ const supplierSchema = new Schema<ISupplier>({
     type: Number,
     required: true,
     min: 0
+  },
+  automationSettings: {
+    autoReplyEnabled: { type: Boolean, default: false },
+    leadScoringEnabled: { type: Boolean, default: false },
+    orderAutomationEnabled: { type: Boolean, default: false },
+    inventoryTrackingEnabled: { type: Boolean, default: false },
+    priceOptimizerEnabled: { type: Boolean, default: false }
   },
   status: {
     type: String,

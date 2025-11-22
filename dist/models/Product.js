@@ -87,6 +87,8 @@ const ProductSchema = new mongoose_1.Schema({
         available: { type: Boolean, default: true },
         quantity: Number,
         minimumOrder: Number,
+        reserved: { type: Number, default: 0 },
+        lastUpdated: { type: Date, default: Date.now }
     },
     status: {
         type: String,

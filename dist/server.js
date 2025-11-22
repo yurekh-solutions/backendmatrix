@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -50,12 +17,8 @@ const product_1 = __importDefault(require("./routes/product"));
 const rfq_1 = __importDefault(require("./routes/rfq"));
 const tracking_1 = __importDefault(require("./routes/tracking"));
 const category_1 = __importDefault(require("./routes/category"));
-const aiInsights_1 = __importDefault(require("./routes/aiInsights"));
-const productEnrichment_1 = __importDefault(require("./routes/productEnrichment"));
-const toolUsage_1 = __importDefault(require("./routes/toolUsage"));
-const toolFeatures_1 = __importDefault(require("./routes/toolFeatures"));
-const autoReply_1 = __importDefault(require("./routes/autoReply"));
-const aiAutoReply_1 = __importDefault(require("./routes/aiAutoReply"));
+const ai_1 = __importDefault(require("./routes/ai"));
+const automation_1 = __importDefault(require("./routes/automation"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -73,7 +36,6 @@ app.use((0, cors_1.default)({
         'https://backendmatrix.onrender.com',
         'https://admin-panel-ritzyard.vercel.app',
         'https://supplierportal.vercel.app',
-        'https://supplierportal-mu.vercel.app',
         'https://supplierportal-yurekh-solutions.vercel.app'
     ],
     credentials: true,
@@ -114,12 +76,8 @@ app.use('/api/products', product_1.default);
 app.use('/api/rfqs', rfq_1.default);
 app.use('/api/tracking', tracking_1.default);
 app.use('/api/categories', category_1.default);
-app.use('/api/ai', aiInsights_1.default);
-app.use('/api/enrich', productEnrichment_1.default);
-app.use('/api/tools', toolUsage_1.default);
-app.use('/api/tool-features', toolFeatures_1.default);
-app.use('/api/auto-replies', autoReply_1.default);
-app.use('/api/ai', aiAutoReply_1.default);
+app.use('/api/ai', ai_1.default);
+app.use('/api/automation', automation_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
@@ -128,33 +86,7 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-// Test email endpoint (for debugging)
-app.post('/api/test-email', async (req, res) => {
-    try {
-        const { email = 'test@example.com' } = req.body;
-        const { sendEmail } = await Promise.resolve().then(() => __importStar(require('./config/email')));
-        const testHtml = `
-      <h2>Test Email from RitzYard</h2>
-      <p>This is a test email to verify the email system is working correctly.</p>
-      <p>If you received this, email notifications are configured properly!</p>
-      <p>Timestamp: ${new Date().toISOString()}</p>
-    `;
-        const result = await sendEmail(email, 'RitzYard Test Email', testHtml);
-        res.json({
-            success: result,
-            message: result ? 'Test email sent successfully' : 'Failed to send test email - check logs and .env configuration',
-            emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
-        });
-    }
-    catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message,
-            emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
-        });
-    }
-});
-// ... existing code ...
+// 404 handler
 app.use((req, res) => {
     res.status(404).json({
         success: false,

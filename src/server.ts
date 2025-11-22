@@ -13,12 +13,8 @@ import productRoutes from './routes/product';
 import rfqRoutes from './routes/rfq';
 import trackingRoutes from './routes/tracking';
 import categoryRoutes from './routes/category';
-import aiInsightsRoutes from './routes/aiInsights';
-import productEnrichmentRoutes from './routes/productEnrichment';
-import toolUsageRoutes from './routes/toolUsage';
-import toolFeaturesRoutes from './routes/toolFeatures';
-import autoReplyRoutes from './routes/autoReply';
-import aiAutoReplyRoutes from './routes/aiAutoReply';
+import aiRoutes from './routes/ai';
+import automationRoutes from './routes/automation';
 
 // Load environment variables
 dotenv.config();
@@ -39,7 +35,6 @@ app.use(cors({
     'https://backendmatrix.onrender.com',
     'https://admin-panel-ritzyard.vercel.app',
     'https://supplierportal.vercel.app',
-    'https://supplierportal-mu.vercel.app',
     'https://supplierportal-yurekh-solutions.vercel.app'
   ],
   credentials: true,
@@ -78,12 +73,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/ai', aiInsightsRoutes);
-app.use('/api/enrich', productEnrichmentRoutes);
-app.use('/api/tools', toolUsageRoutes);
-app.use('/api/tool-features', toolFeaturesRoutes);
-app.use('/api/auto-replies', autoReplyRoutes);
-app.use('/api/ai', aiAutoReplyRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/automation', automationRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
@@ -94,35 +85,7 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
-// Test email endpoint (for debugging)
-app.post('/api/test-email', async (req: Request, res: Response) => {
-  try {
-    const { email = 'test@example.com' } = req.body;
-    const { sendEmail } = await import('./config/email');
-    
-    const testHtml = `
-      <h2>Test Email from RitzYard</h2>
-      <p>This is a test email to verify the email system is working correctly.</p>
-      <p>If you received this, email notifications are configured properly!</p>
-      <p>Timestamp: ${new Date().toISOString()}</p>
-    `;
-    
-    const result = await sendEmail(email, 'RitzYard Test Email', testHtml);
-    
-    res.json({
-      success: result,
-      message: result ? 'Test email sent successfully' : 'Failed to send test email - check logs and .env configuration',
-      emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-      emailCredentialsConfigured: !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD)
-    });
-  }
-});
-// ... existing code ...
+// 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,

@@ -34,31 +34,52 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const autoReplySchema = new mongoose_1.Schema({
+const leadSchema = new mongoose_1.Schema({
     supplierId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Supplier',
         required: true
     },
-    messageType: {
-        type: String,
-        required: true,
-        enum: ['general-inquiry', 'price-quote', 'product-availability', 'custom']
-    },
-    responseText: {
+    name: {
         type: String,
         required: true
     },
-    triggerKeywords: [{
+    email: {
+        type: String,
+        required: true
+    },
+    phone: String,
+    company: String,
+    message: {
+        type: String,
+        required: true
+    },
+    source: {
+        type: String,
+        required: true,
+        enum: ['website', 'referral', 'social-media', 'email', 'other']
+    },
+    score: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    status: {
+        type: String,
+        enum: ['new', 'contacted', 'qualified', 'unqualified', 'converted'],
+        default: 'new'
+    },
+    tags: [{
             type: String
         }],
-    isActive: {
-        type: Boolean,
-        default: true
+    assignedTo: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Admin'
     }
 }, {
     timestamps: true
 });
 // Index for faster queries
-autoReplySchema.index({ supplierId: 1, isActive: 1 });
-exports.default = mongoose_1.default.model('AutoReply', autoReplySchema);
+leadSchema.index({ supplierId: 1, status: 1 });
+leadSchema.index({ score: -1 }); // High score leads first
+exports.default = mongoose_1.default.model('Lead', leadSchema);

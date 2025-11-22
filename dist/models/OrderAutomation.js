@@ -34,31 +34,73 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const autoReplySchema = new mongoose_1.Schema({
+const orderAutomationSchema = new mongoose_1.Schema({
     supplierId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Supplier',
         required: true
     },
-    messageType: {
+    orderId: {
         type: String,
         required: true,
-        enum: ['general-inquiry', 'price-quote', 'product-availability', 'custom']
+        unique: true
     },
-    responseText: {
+    customerName: {
         type: String,
         required: true
     },
-    triggerKeywords: [{
-            type: String
+    customerEmail: {
+        type: String,
+        required: true
+    },
+    products: [{
+            productId: {
+                type: mongoose_1.Schema.Types.ObjectId,
+                ref: 'Product'
+            },
+            name: String,
+            quantity: Number,
+            price: Number
         }],
-    isActive: {
-        type: Boolean,
-        default: true
-    }
+    totalAmount: {
+        type: Number,
+        required: true
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+        default: 'pending'
+    },
+    trackingId: String,
+    automationSteps: [{
+            step: {
+                type: String,
+                enum: ['order-confirmation', 'invoice-generation', 'payment-processing', 'shipment', 'delivery']
+            },
+            status: {
+                type: String,
+                enum: ['pending', 'completed', 'failed'],
+                default: 'pending'
+            },
+            timestamp: Date,
+            details: String
+        }],
+    notifications: [{
+            type: {
+                type: String,
+                enum: ['email', 'sms']
+            },
+            sent: {
+                type: Boolean,
+                default: false
+            },
+            timestamp: Date,
+            recipient: String
+        }]
 }, {
     timestamps: true
 });
 // Index for faster queries
-autoReplySchema.index({ supplierId: 1, isActive: 1 });
-exports.default = mongoose_1.default.model('AutoReply', autoReplySchema);
+orderAutomationSchema.index({ supplierId: 1, status: 1 });
+orderAutomationSchema.index({ orderId: 1 });
+exports.default = mongoose_1.default.model('OrderAutomation', orderAutomationSchema);

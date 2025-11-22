@@ -12,7 +12,8 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
     // Handle image upload
     let imageUrl = '';
     if (req.file) {
-      imageUrl = `/uploads/${req.file.filename}`;
+      const apiUrl = process.env.API_URL || 'http://localhost:5000';
+      imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
     }
 
     // Handle custom category request
@@ -89,9 +90,20 @@ export const getSupplierProducts = async (req: AuthRequest, res: Response) => {
     const supplierId = req.supplier._id;
     const products = await Product.find({ supplierId }).sort({ createdAt: -1 });
 
+    // Convert relative image paths to absolute URLs
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const productsWithFullImageUrls = products.map(product => {
+      const productObj = product.toObject();
+      if (productObj.image && !productObj.image.startsWith('http')) {
+        // If it's a relative path, make it absolute
+        productObj.image = `${apiUrl}${productObj.image}`;
+      }
+      return productObj;
+    });
+
     res.json({
       success: true,
-      data: products,
+      data: productsWithFullImageUrls,
     });
   } catch (error) {
     res.status(500).json({
@@ -181,9 +193,19 @@ export const getAllProducts = async (req: any, res: Response) => {
       .populate('supplierId', 'companyName email phone')
       .sort({ createdAt: -1 });
 
+    // Convert relative image paths to absolute URLs
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const productsWithFullImageUrls = products.map(product => {
+      const productObj = product.toObject();
+      if (productObj.image && !productObj.image.startsWith('http')) {
+        productObj.image = `${apiUrl}${productObj.image}`;
+      }
+      return productObj;
+    });
+
     res.json({
       success: true,
-      data: products,
+      data: productsWithFullImageUrls,
     });
   } catch (error) {
     res.status(500).json({
@@ -208,9 +230,16 @@ export const getProductById = async (req: any, res: Response) => {
       });
     }
 
+    // Convert relative image path to absolute URL
+    const productObj = product.toObject();
+    if (productObj.image && !productObj.image.startsWith('http')) {
+      const apiUrl = process.env.API_URL || 'http://localhost:5000';
+      productObj.image = `${apiUrl}${productObj.image}`;
+    }
+
     res.json({
       success: true,
-      data: product,
+      data: productObj,
     });
   } catch (error) {
     res.status(500).json({

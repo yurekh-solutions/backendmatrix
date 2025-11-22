@@ -34,31 +34,40 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
-const autoReplySchema = new mongoose_1.Schema({
+const analyticsSchema = new mongoose_1.Schema({
     supplierId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: 'Supplier',
         required: true
     },
-    messageType: {
+    metricType: {
         type: String,
         required: true,
-        enum: ['general-inquiry', 'price-quote', 'product-availability', 'custom']
+        enum: [
+            'product-view',
+            'inquiry',
+            'order',
+            'conversion',
+            'revenue',
+            'auto-reply',
+            'lead-score',
+            'inventory-level'
+        ]
     },
-    responseText: {
-        type: String,
+    value: {
+        type: Number,
         required: true
     },
-    triggerKeywords: [{
-            type: String
-        }],
-    isActive: {
-        type: Boolean,
-        default: true
+    category: String,
+    metadata: mongoose_1.Schema.Types.Mixed,
+    timestamp: {
+        type: Date,
+        default: Date.now
     }
 }, {
     timestamps: true
 });
 // Index for faster queries
-autoReplySchema.index({ supplierId: 1, isActive: 1 });
-exports.default = mongoose_1.default.model('AutoReply', autoReplySchema);
+analyticsSchema.index({ supplierId: 1, metricType: 1, timestamp: -1 });
+analyticsSchema.index({ timestamp: -1 });
+exports.default = mongoose_1.default.model('Analytics', analyticsSchema);

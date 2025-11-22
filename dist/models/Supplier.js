@@ -111,6 +111,13 @@ const supplierSchema = new mongoose_1.Schema({
         required: true,
         min: 0
     },
+    automationSettings: {
+        autoReplyEnabled: { type: Boolean, default: false },
+        leadScoringEnabled: { type: Boolean, default: false },
+        orderAutomationEnabled: { type: Boolean, default: false },
+        inventoryTrackingEnabled: { type: Boolean, default: false },
+        priceOptimizerEnabled: { type: Boolean, default: false }
+    },
     status: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],

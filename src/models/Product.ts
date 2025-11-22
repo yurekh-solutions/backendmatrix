@@ -32,6 +32,8 @@ export interface IProduct extends Document {
     available: boolean;
     quantity?: number;
     minimumOrder?: number;
+    reserved?: number; // Reserved for orders
+    lastUpdated?: Date;
   };
   status: 'active' | 'inactive' | 'pending' | 'rejected';
   rejectionReason?: string;
@@ -93,6 +95,8 @@ const ProductSchema = new Schema<IProduct>(
       available: { type: Boolean, default: true },
       quantity: Number,
       minimumOrder: Number,
+      reserved: { type: Number, default: 0 },
+      lastUpdated: { type: Date, default: Date.now }
     },
     status: {
       type: String,
