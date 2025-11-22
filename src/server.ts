@@ -35,7 +35,8 @@ app.use(cors({
     'https://backendmatrix.onrender.com',
     'https://admin-panel-ritzyard.vercel.app',
     'https://supplierportal.vercel.app',
-    'https://supplierportal-yurekh-solutions.vercel.app'
+    'https://supplierportal-yurekh-solutions.vercel.app',
+    'https://supplierportal-mu.vercel.app' // Added missing supplier portal domain
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
