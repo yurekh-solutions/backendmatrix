@@ -24,6 +24,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 // CORS configuration with file upload support
+// Force redeploy to apply CORS changes
 app.use(cors({
   origin: [
     'http://localhost:8080',
