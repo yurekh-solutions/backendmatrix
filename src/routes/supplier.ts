@@ -1,6 +1,7 @@
 import express from 'express';
-import { submitOnboarding, checkApplicationStatus } from '../controllers/supplierController';
+import { submitOnboarding, checkApplicationStatus, getSupplierInquiries } from '../controllers/supplierController';
 import { upload } from '../config/multer';
+import { supplierAuth } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -19,5 +20,8 @@ router.post(
 );
 
 router.get('/check-status', checkApplicationStatus);
+
+// Protected route - get supplier's inquiries
+router.get('/inquiries', supplierAuth, getSupplierInquiries);
 
 export default router;

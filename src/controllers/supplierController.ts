@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Supplier from '../models/Supplier';
+import Lead from '../models/Lead';
 import path from 'path';
 
 export const submitOnboarding = async (req: Request, res: Response) => {
@@ -196,6 +197,57 @@ export const checkApplicationStatus = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+// Get all inquiries (leads) for a supplier
+export const getSupplierInquiries = async (req: any, res: Response) => {
+  try {
+    const supplierId = req.supplier?._id;
+    
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    console.log('🚀 Fetching inquiries for supplier:', supplierId);
+
+    // Fetch all leads for this supplier
+    const inquiries = await Lead.find({ supplierId })
+      .sort({ createdAt: -1 })
+      .limit(500);
+
+    // Transform leads to inquiry format
+    const formattedInquiries = inquiries.map((inquiry: any) => ({
+      _id: inquiry._id,
+      productId: inquiry.productId || 'N/A',
+      productName: inquiry.productName || inquiry.company || 'Product Inquiry',
+      buyerName: inquiry.name || 'Buyer',
+      buyerEmail: inquiry.email || 'N/A',
+      quantity: inquiry.quantity || 0,
+      unit: inquiry.unit || 'units',
+      budget: inquiry.budget || `₹${(inquiry.potential || 0).toLocaleString()}`,
+      description: inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
+      status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
+      createdAt: inquiry.createdAt,
+      updatedAt: inquiry.updatedAt
+    }));
+
+    console.log(`✅ Found ${formattedInquiries.length} inquiries`);
+
+    res.json({
+      success: true,
+      inquiries: formattedInquiries,
+      count: formattedInquiries.length
+    });
+  } catch (error: any) {
+    console.error('❌ Error fetching inquiries:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch inquiries'
     });
   }
 };

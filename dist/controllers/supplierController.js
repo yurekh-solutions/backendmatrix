@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkApplicationStatus = exports.submitOnboarding = void 0;
+exports.getSupplierInquiries = exports.checkApplicationStatus = exports.submitOnboarding = void 0;
 const Supplier_1 = __importDefault(require("../models/Supplier"));
+const Lead_1 = __importDefault(require("../models/Lead"));
 const submitOnboarding = async (req, res) => {
     try {
         console.log('📥 Received onboarding submission');
@@ -179,3 +180,49 @@ const checkApplicationStatus = async (req, res) => {
     }
 };
 exports.checkApplicationStatus = checkApplicationStatus;
+// Get all inquiries (leads) for a supplier
+const getSupplierInquiries = async (req, res) => {
+    try {
+        const supplierId = req.supplier?._id;
+        if (!supplierId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+        }
+        console.log('🚀 Fetching inquiries for supplier:', supplierId);
+        // Fetch all leads for this supplier
+        const inquiries = await Lead_1.default.find({ supplierId })
+            .sort({ createdAt: -1 })
+            .limit(500);
+        // Transform leads to inquiry format
+        const formattedInquiries = inquiries.map((inquiry) => ({
+            _id: inquiry._id,
+            productId: inquiry.productId || 'N/A',
+            productName: inquiry.productName || inquiry.company || 'Product Inquiry',
+            buyerName: inquiry.name || 'Buyer',
+            buyerEmail: inquiry.email || 'N/A',
+            quantity: inquiry.quantity || 0,
+            unit: inquiry.unit || 'units',
+            budget: inquiry.budget || `₹${(inquiry.potential || 0).toLocaleString()}`,
+            description: inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
+            status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
+            createdAt: inquiry.createdAt,
+            updatedAt: inquiry.updatedAt
+        }));
+        console.log(`✅ Found ${formattedInquiries.length} inquiries`);
+        res.json({
+            success: true,
+            inquiries: formattedInquiries,
+            count: formattedInquiries.length
+        });
+    }
+    catch (error) {
+        console.error('❌ Error fetching inquiries:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch inquiries'
+        });
+    }
+};
+exports.getSupplierInquiries = getSupplierInquiries;

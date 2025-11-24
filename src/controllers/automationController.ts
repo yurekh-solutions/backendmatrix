@@ -416,8 +416,10 @@ export const getAutomationStats = async (req: any, res: Response) => {
 // Tool usage tracking
 export const recordToolClick = async (req: any, res: Response) => {
   try {
-    const supplierId = req.supplier?.id || req.admin?.supplierId;
+    const supplierId = req.supplier?._id || req.admin?._id;
+    console.log('🚀 recordToolClick - supplierId:', supplierId);
     if (!supplierId) {
+      console.log('❌ recordToolClick - No supplierId found');
       return res.status(401).json({
         success: false,
         message: 'Unauthorized'
@@ -425,6 +427,7 @@ export const recordToolClick = async (req: any, res: Response) => {
     }
 
     const { toolName, toolType, description } = req.body;
+    console.log('📋 Recording tool click:', { toolName, toolType, description });
 
     // Log analytics
     await Analytics.create({
@@ -434,14 +437,17 @@ export const recordToolClick = async (req: any, res: Response) => {
       metadata: { toolName, toolType, description }
     });
 
+    console.log('✅ Tool usage recorded successfully');
     res.json({
       success: true,
       message: 'Tool usage recorded'
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ recordToolClick error:', error.message, error.stack);
     res.status(500).json({
       success: false,
-      message: 'Failed to record tool usage'
+      message: 'Failed to record tool usage',
+      error: error.message
     });
   }
 };
