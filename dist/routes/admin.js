@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const adminController_1 = require("../controllers/adminController");
 const automationController_1 = require("../controllers/automationController");
+const rfqController_1 = require("../controllers/rfqController");
 const auth_1 = require("../middleware/auth");
 const router = express_1.default.Router();
 // All routes require admin authentication
@@ -31,4 +32,6 @@ router.post('/automation/leads/:id/assign', automationController_1.assignLead);
 router.get('/automation/orders', automationController_1.getOrders);
 router.post('/automation/orders/:id/auto-process', automationController_1.autoProcessOrder);
 router.get('/automation/metrics', automationController_1.getPerformanceAnalytics);
+// RFQ routes
+router.get('/rfqs', rfqController_1.getAllRFQs);
 exports.default = router;
