@@ -20,7 +20,7 @@ const category_1 = __importDefault(require("./routes/category"));
 const ai_1 = __importDefault(require("./routes/ai"));
 const automation_1 = __importDefault(require("./routes/automation"));
 const adminAutomation_1 = __importDefault(require("./routes/adminAutomation"));
-const milo_1 = __importDefault(require("./routes/milo"));
+const miloGuide_1 = __importDefault(require("./routes/miloGuide"));
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -79,7 +79,7 @@ app.use('/api/tracking', tracking_1.default);
 app.use('/api/categories', category_1.default);
 app.use('/api/ai', ai_1.default);
 app.use('/api/automation', automation_1.default);
-app.use('/api/milo', milo_1.default);
+app.use('/api/milo/guide', miloGuide_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({

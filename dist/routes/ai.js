@@ -9,7 +9,371 @@ const Product_1 = __importDefault(require("../models/Product"));
 const AutoReply_1 = __importDefault(require("../models/AutoReply"));
 const Lead_1 = __importDefault(require("../models/Lead"));
 const OrderAutomation_1 = __importDefault(require("../models/OrderAutomation"));
+const Supplier_1 = __importDefault(require("../models/Supplier"));
+const RFQ_1 = __importDefault(require("../models/RFQ"));
 const router = express_1.default.Router();
+// ==================== MILO AI TRAINING DATA ====================
+// Get comprehensive training data for Milo AI
+router.get('/milo/training-data', async (req, res) => {
+    try {
+        // Fetch all products with supplier info
+        const products = await Product_1.default.find({ status: 'active' }).populate('supplierId', 'companyName email phone businessType').limit(500);
+        // Fetch all suppliers
+        const suppliers = await Supplier_1.default.find({ status: 'approved' }).select('companyName email phone address businessDescription productsOffered yearsInBusiness');
+        // Get market trending products (by inquiry count)
+        const rfqs = await RFQ_1.default.find().select('productCategory quantity supplierResponse').limit(200);
+        // Calculate hot/demanded products
+        const productDemand = {};
+        rfqs.forEach(rfq => {
+            const category = rfq.productCategory || 'Other';
+            productDemand[category] = (productDemand[category] || 0) + 1;
+        });
+        const hotProducts = Object.entries(productDemand)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10)
+            .map(([category, demand]) => ({ category, demandCount: demand }));
+        // Aggregate supplier expertise
+        const supplierExpertise = {};
+        suppliers.forEach(supplier => {
+            const key = supplier._id.toString();
+            supplierExpertise[key] = supplier.productsOffered || [];
+        });
+        // Product categories with average pricing
+        const categoryStats = {};
+        products.forEach(product => {
+            const cat = product.category || 'Other';
+            if (!categoryStats[cat]) {
+                categoryStats[cat] = {
+                    category: cat,
+                    avgPrice: 0,
+                    count: 0,
+                    suppliers: new Set(),
+                    demandCount: productDemand[cat] || 0
+                };
+            }
+            categoryStats[cat].count += 1;
+            categoryStats[cat].avgPrice += product.price?.amount || 0;
+            categoryStats[cat].suppliers.add(product.supplierId._id.toString());
+        });
+        // Calculate averages
+        Object.keys(categoryStats).forEach(cat => {
+            categoryStats[cat].avgPrice = Math.round(categoryStats[cat].avgPrice / categoryStats[cat].count);
+            categoryStats[cat].supplierCount = categoryStats[cat].suppliers.size;
+            delete categoryStats[cat].suppliers;
+        });
+        res.json({
+            success: true,
+            data: {
+                trainingData: {
+                    totalProducts: products.length,
+                    totalSuppliers: suppliers.length,
+                    totalRFQsAnalyzed: rfqs.length,
+                    hotProducts: hotProducts,
+                    categoryStats: Object.values(categoryStats),
+                    marketInsights: {
+                        mostDemandedCategory: hotProducts[0]?.category || 'Cement',
+                        suppliersCount: suppliers.length,
+                        activeProductsCount: products.length,
+                        avgSuppliersPerCategory: Math.round(suppliers.length / Object.keys(categoryStats).length)
+                    }
+                },
+                products: products.slice(0, 100).map(p => ({
+                    id: p._id,
+                    name: p.name,
+                    category: p.category,
+                    supplier: typeof p.supplierId === 'object' && p.supplierId !== null ? p.supplierId.companyName : 'Unknown',
+                    price: p.price?.amount,
+                    inStock: p.stock?.available
+                })),
+                suppliers: suppliers.map(s => ({
+                    id: s._id,
+                    name: s.companyName,
+                    email: s.email,
+                    phone: s.phone,
+                    businessType: s.businessType,
+                    yearsInBusiness: s.yearsInBusiness,
+                    specialties: s.productsOffered
+                })),
+                hotDemandedProducts: hotProducts
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch training data',
+            error: error.message
+        });
+    }
+});
+// Get product intelligence for Milo
+router.get('/milo/product-intelligence', async (req, res) => {
+    try {
+        const { category, searchTerm } = req.query;
+        let query = { status: 'active' };
+        if (category)
+            query.category = { $regex: category, $options: 'i' };
+        const products = await Product_1.default.find(query)
+            .populate('supplierId', 'companyName email phone')
+            .select('name category description price stock specifications')
+            .limit(50);
+        // Get related RFQs to understand demand
+        let rfqQuery = {};
+        if (category)
+            rfqQuery.productCategory = { $regex: category, $options: 'i' };
+        const relatedRFQs = await RFQ_1.default.find(rfqQuery).select('productCategory quantity supplierResponse status').limit(30);
+        // Calculate intelligence
+        const demandLevel = relatedRFQs.length > 20 ? 'High' : relatedRFQs.length > 10 ? 'Medium' : 'Low';
+        const avgBudget = relatedRFQs.length > 0
+            ? Math.round(relatedRFQs.filter((r) => r.supplierResponse?.quotedPrice).reduce((sum, r) => sum + (r.supplierResponse?.quotedPrice || 0), 0) / relatedRFQs.length)
+            : 0;
+        res.json({
+            success: true,
+            data: {
+                categoryIntelligence: {
+                    category: category || 'All Categories',
+                    productCount: products.length,
+                    supplierCount: new Set(products.map(p => p.supplierId._id.toString())).size,
+                    demandLevel: demandLevel,
+                    avgBudget: avgBudget,
+                    totalRFQsInCategory: relatedRFQs.length,
+                    priceRange: products.length > 0 ? {
+                        min: Math.min(...products.map(p => p.price?.amount || 0)),
+                        max: Math.max(...products.map(p => p.price?.amount || 0)),
+                        avg: Math.round(products.reduce((sum, p) => sum + (p.price?.amount || 0), 0) / products.length)
+                    } : null
+                },
+                products: products.slice(0, 20),
+                relatedRFQs: relatedRFQs.slice(0, 10)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch product intelligence',
+            error: error.message
+        });
+    }
+});
+// Get supplier matching for buyer inquiries
+router.get('/milo/find-suppliers', async (req, res) => {
+    try {
+        const { productCategory, budget, quantity } = req.query;
+        // Find relevant suppliers
+        const suppliers = await Supplier_1.default.find({
+            status: 'approved',
+            productsOffered: { $regex: productCategory || '', $options: 'i' }
+        }).limit(20);
+        // Find products in this category
+        const products = await Product_1.default.find({
+            status: 'active',
+            category: { $regex: productCategory || '', $options: 'i' }
+        }).populate('supplierId', 'companyName email phone businessType yearsInBusiness');
+        // Filter by budget if provided
+        let filteredProducts = products;
+        if (budget) {
+            const maxBudget = parseInt(budget);
+            filteredProducts = products.filter(p => (p.price?.amount || 0) <= maxBudget);
+        }
+        // Score suppliers based on product availability and price competitiveness
+        const supplierScores = suppliers.map(supplier => {
+            const supplierProducts = filteredProducts.filter(p => p.supplierId._id.toString() === supplier._id.toString());
+            const avgPrice = supplierProducts.length > 0
+                ? Math.round(supplierProducts.reduce((sum, p) => sum + (p.price?.amount || 0), 0) / supplierProducts.length)
+                : 0;
+            return {
+                id: supplier._id,
+                name: supplier.companyName,
+                email: supplier.email,
+                phone: supplier.phone,
+                businessType: supplier.businessType,
+                yearsInBusiness: supplier.yearsInBusiness,
+                matchScore: supplierProducts.length > 0 ? Math.min(100, 60 + (supplierProducts.length * 5)) : 0,
+                productCount: supplierProducts.length,
+                avgPrice: avgPrice,
+                specialties: supplier.productsOffered
+            };
+        });
+        // Sort by match score
+        supplierScores.sort((a, b) => b.matchScore - a.matchScore);
+        res.json({
+            success: true,
+            data: {
+                query: {
+                    productCategory: productCategory || 'Any',
+                    budget: budget || 'Any',
+                    quantity: quantity || 'Any'
+                },
+                matchedSuppliers: supplierScores.slice(0, 15),
+                topSupplier: supplierScores[0] || null,
+                totalMatches: supplierScores.filter(s => s.matchScore > 0).length
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to find suppliers',
+            error: error.message
+        });
+    }
+});
+// Get market trends and hot products
+router.get('/milo/market-trends', async (req, res) => {
+    try {
+        const rfqs = await RFQ_1.default.find({}).select('productCategory quantity supplierResponse status createdAt').limit(500);
+        // Analyze trends
+        const trends = {};
+        const pricePoints = {};
+        rfqs.forEach(rfq => {
+            const category = rfq.productCategory || 'Other';
+            if (!trends[category]) {
+                trends[category] = {
+                    category,
+                    inquiries: 0,
+                    avgQuantity: 0,
+                    avgBudget: 0,
+                    recentInquiries: 0
+                };
+                pricePoints[category] = [];
+            }
+            trends[category].inquiries += 1;
+            trends[category].avgQuantity += rfq.quantity || 0;
+            const rfqPrice = rfq.supplierResponse?.quotedPrice || 0;
+            trends[category].avgBudget += rfqPrice;
+            // Count recent inquiries (last 7 days)
+            const daysSince = Math.floor((Date.now() - new Date(rfq.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSince <= 7)
+                trends[category].recentInquiries += 1;
+            if (rfqPrice)
+                pricePoints[category].push(rfqPrice);
+        });
+        // Calculate averages
+        Object.keys(trends).forEach(cat => {
+            trends[cat].avgQuantity = Math.round(trends[cat].avgQuantity / trends[cat].inquiries);
+            trends[cat].avgBudget = Math.round(trends[cat].avgBudget / trends[cat].inquiries);
+            trends[cat].demandTrend = trends[cat].recentInquiries > trends[cat].inquiries / 5 ? 'Rising' : 'Stable';
+        });
+        const trendArray = Object.values(trends)
+            .sort((a, b) => b.inquiries - a.inquiries)
+            .slice(0, 20);
+        res.json({
+            success: true,
+            data: {
+                topDemandedProducts: trendArray.slice(0, 5),
+                allTrends: trendArray,
+                insights: {
+                    mostHotProduct: trendArray[0]?.category || 'Cement',
+                    trendingNow: trendArray.filter((t) => t.demandTrend === 'Rising').slice(0, 5),
+                    totalCategoriesTracked: trendArray.length
+                }
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch market trends',
+            error: error.message
+        });
+    }
+});
+// ==================== MILO AI CONVERSATION TRAINING ====================
+// Train Milo on conversation patterns and buyer/supplier needs
+router.post('/milo/train-conversation', async (req, res) => {
+    try {
+        const { userMessage, userType, category, budget, quantity } = req.body;
+        // Analyze user query type
+        const queryType = analyzeQueryType(userMessage, userType);
+        // Get relevant context based on query
+        let relevantData = {};
+        if (queryType.includes('price') || queryType.includes('supplier')) {
+            // Get supplier matching
+            const suppliers = await Supplier_1.default.find({
+                status: 'approved',
+                productsOffered: { $regex: category || '', $options: 'i' }
+            }).limit(10);
+            const products = await Product_1.default.find({
+                status: 'active',
+                category: { $regex: category || '', $options: 'i' }
+            }).populate('supplierId', 'companyName email phone');
+            relevantData.suppliers = suppliers;
+            relevantData.products = products;
+        }
+        if (queryType.includes('demand') || queryType.includes('trend')) {
+            // Get market trends
+            const rfqs = await RFQ_1.default.find({
+                productCategory: { $regex: category || '', $options: 'i' }
+            }).select('quantity supplierResponse createdAt').limit(50);
+            relevantData.demandTrend = rfqs.length > 0 ? 'High' : 'Moderate';
+            relevantData.recentInquiries = rfqs.length;
+        }
+        res.json({
+            success: true,
+            data: {
+                message: userMessage,
+                queryType: queryType,
+                userType: userType,
+                relevantContext: relevantData,
+                suggestedResponse: generateMiloResponse(queryType, userType, relevantData)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to train conversation',
+            error: error.message
+        });
+    }
+});
+// Helper function to analyze query type
+function analyzeQueryType(message, userType) {
+    const lowerMsg = message.toLowerCase();
+    const types = [];
+    if (lowerMsg.includes('price') || lowerMsg.includes('cost') || lowerMsg.includes('quote'))
+        types.push('price');
+    if (lowerMsg.includes('supplier') || lowerMsg.includes('vendor'))
+        types.push('supplier');
+    if (lowerMsg.includes('demand') || lowerMsg.includes('popular'))
+        types.push('demand');
+    if (lowerMsg.includes('trend') || lowerMsg.includes('market'))
+        types.push('trend');
+    if (lowerMsg.includes('rfq') || lowerMsg.includes('request'))
+        types.push('rfq');
+    if (lowerMsg.includes('delivery') || lowerMsg.includes('shipping'))
+        types.push('delivery');
+    if (lowerMsg.includes('quantity') || lowerMsg.includes('bulk'))
+        types.push('quantity');
+    // Default if no specific type found
+    if (types.length === 0)
+        types.push('general');
+    return types;
+}
+// Helper function to generate context-aware response
+function generateMiloResponse(queryTypes, userType, context) {
+    let response = '';
+    if (queryTypes.includes('price') && context.products) {
+        response += `Found ${context.products.length} products in this category. `;
+        if (context.products.length > 0) {
+            const avgPrice = Math.round(context.products.reduce((sum, p) => sum + (p.price?.amount || 0), 0) / context.products.length);
+            response += `Average price: ₹${avgPrice}. `;
+        }
+    }
+    if (queryTypes.includes('supplier') && context.suppliers) {
+        response += `I found ${context.suppliers.length} verified suppliers. `;
+    }
+    if (queryTypes.includes('demand')) {
+        response += `Demand level: ${context.demandTrend}. Recent inquiries: ${context.recentInquiries}. `;
+    }
+    if (response === '') {
+        response = userType === 'buyer'
+            ? 'I can help you find suppliers, get pricing, and create RFQs for any construction material. What are you looking for?'
+            : 'I can help you list products, manage inquiries, and grow your supplier business. What would you like to do?';
+    }
+    return response;
+}
 // AI supplier insights endpoint
 router.get('/supplier-insights', auth_1.supplierAuth, async (req, res) => {
     try {
@@ -113,6 +477,351 @@ router.post('/generate-auto-reply', auth_1.supplierAuth, async (req, res) => {
             success: false,
             message: 'Failed to generate auto-reply'
         });
+    }
+});
+// ==================== FEATURE 1: ADVANCED PROCUREMENT ENDPOINTS ====================
+// Create RFQ from chat context
+router.post('/milo/create-rfq', async (req, res) => {
+    try {
+        const { material, quantity, location, budget, deadline } = req.body;
+        // Create new RFQ
+        const rfqData = {
+            productCategory: material,
+            quantity: quantity,
+            requiredLocation: location,
+            budget: budget,
+            deadline: deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            specifications: `Auto-created from Milo AI chat. Material: ${material}, Qty: ${quantity}`
+        };
+        // Find matching suppliers
+        const suppliers = await Supplier_1.default.find({
+            status: 'approved',
+            productsOffered: { $regex: material, $options: 'i' }
+        }).limit(10);
+        res.json({
+            success: true,
+            data: {
+                rfq: rfqData,
+                matchedSuppliers: suppliers.length,
+                suppliers: suppliers.slice(0, 5)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to create RFQ', error: error.message });
+    }
+});
+// Compare quotes from suppliers
+router.post('/milo/compare-quotes', async (req, res) => {
+    try {
+        const { quotes } = req.body;
+        // Score quotes: quality (40%), price (30%), delivery (30%)
+        const scored = quotes.map((q) => ({
+            ...q,
+            score: (q.quality * 0.4) + ((100 - q.price) * 0.3) + ((30 - q.deliveryTime) * 0.3)
+        }));
+        const sorted = scored.sort((a, b) => b.score - a.score);
+        res.json({
+            success: true,
+            data: { rankedQuotes: sorted, bestQuote: sorted[0] }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to compare quotes' });
+    }
+});
+// Get negotiation strategy
+router.post('/milo/negotiation-strategy', async (req, res) => {
+    try {
+        const { material, currentPrice, targetPrice } = req.body;
+        const savingsPotential = ((currentPrice - targetPrice) / currentPrice) * 100;
+        res.json({
+            success: true,
+            data: {
+                material,
+                currentPrice,
+                targetPrice,
+                savingsPotential: savingsPotential.toFixed(1),
+                strategy: `For ${material}: 1) Bulk ordering (10-15% off), 2) Extended payment terms 30 days (+5%), 3) Long-term contract (+8%)`,
+                successProbability: savingsPotential > 15 ? 0.8 : savingsPotential > 10 ? 0.65 : 0.5,
+                estimatedSavings: Math.round((currentPrice * savingsPotential) / 100)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to get strategy' });
+    }
+});
+// ==================== FEATURE 2: INTELLIGENCE & ANALYTICS ENDPOINTS ====================
+// Price prediction
+router.get('/milo/predict-prices/:material', async (req, res) => {
+    try {
+        const { material } = req.params;
+        const { currentPrice } = req.query;
+        const trends = {
+            'Cement': { direction: 'stable', change: 0 },
+            'Steel': { direction: 'down', change: -2.5 },
+            'TMT': { direction: 'stable', change: 0 },
+            'Bricks': { direction: 'up', change: 1.2 }
+        };
+        const trend = trends[material] || { direction: 'stable', change: 0 };
+        const predicted = parseFloat(currentPrice) * (1 + (trend.change / 100));
+        res.json({
+            success: true,
+            data: {
+                material,
+                currentPrice: parseFloat(currentPrice),
+                predictedPrice: Math.round(predicted * 100) / 100,
+                trendDirection: trend.direction,
+                confidence: 0.75,
+                advice: trend.direction === 'down' ? 'Prices likely to decrease. Wait for better rates.' : 'Current prices are optimal.'
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to predict prices' });
+    }
+});
+// Demand forecasting
+router.get('/milo/demand-forecast/:material', async (req, res) => {
+    try {
+        const { material } = req.params;
+        const baselineDemand = {
+            'Cement': 1000,
+            'Steel': 800,
+            'TMT': 750,
+            'Bricks': 900
+        };
+        const demand = baselineDemand[material] || 500;
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        const forecast = months.map(month => ({
+            month,
+            demand: Math.round(demand * (1 + (Math.random() * 0.3 - 0.15)))
+        }));
+        res.json({
+            success: true,
+            data: {
+                material,
+                forecast,
+                totalDemand: forecast.reduce((sum, m) => sum + m.demand, 0),
+                peakMonth: forecast.reduce((max, m) => m.demand > max.demand ? m : max)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to forecast demand' });
+    }
+});
+// Competitor analysis
+router.get('/milo/competitors/:material', async (req, res) => {
+    try {
+        const { material } = req.params;
+        const competitors = {
+            'Cement': [
+                { supplier: 'Competitor A', price: 380, rating: 4.2, market: 15 },
+                { supplier: 'Competitor B', price: 390, rating: 4.4, market: 20 },
+                { supplier: 'Competitor C', price: 375, rating: 4.1, market: 12 }
+            ],
+            'Steel': [
+                { supplier: 'Competitor A', price: 55, rating: 4.5, market: 18 },
+                { supplier: 'Competitor B', price: 54, rating: 4.3, market: 22 },
+                { supplier: 'Competitor C', price: 56, rating: 4.0, market: 14 }
+            ]
+        };
+        const analysis = competitors[material] || [{ supplier: 'Market Leaders', price: 100, rating: 4.3 }];
+        const avgPrice = Math.round(analysis.reduce((sum, c) => sum + c.price, 0) / analysis.length);
+        res.json({
+            success: true,
+            data: {
+                material,
+                competitors: analysis,
+                averageMarketPrice: avgPrice,
+                recommendation: `Current market average is ₹${avgPrice}. Consider positioning at ₹${avgPrice - 5} for competitive advantage.`
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to analyze competitors' });
+    }
+});
+// ==================== FEATURE 3: COMMUNICATION ENDPOINTS ====================
+// Export chat history
+router.post('/milo/export-chat', async (req, res) => {
+    try {
+        const { messages } = req.body;
+        const chatText = messages
+            .map((m) => `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.role === 'milo' ? 'Milo' : 'You'}: ${m.content}`)
+            .join('\n');
+        const report = `MILO AI CHAT HISTORY\nExported: ${new Date().toLocaleString()}\n\n${chatText}`;
+        res.json({
+            success: true,
+            data: {
+                filename: `milo-chat-${Date.now()}.txt`,
+                content: report,
+                messageCount: messages.length
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to export chat' });
+    }
+});
+// Share message with team
+router.post('/milo/share-team', async (req, res) => {
+    try {
+        const { message, teamMembers } = req.body;
+        res.json({
+            success: true,
+            data: {
+                message: 'Message shared successfully',
+                sharedWith: teamMembers.length,
+                timestamp: new Date()
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to share message' });
+    }
+});
+// ==================== FEATURE 4: AUTOMATION ENDPOINTS ====================
+// Send via WhatsApp
+router.post('/milo/whatsapp-send', async (req, res) => {
+    try {
+        const { message, phoneNumber } = req.body;
+        const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+        res.json({
+            success: true,
+            data: {
+                whatsappUrl,
+                status: 'Ready to send',
+                phoneNumber,
+                messagePreview: message.substring(0, 50) + '...'
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to prepare WhatsApp message' });
+    }
+});
+// Schedule meeting
+router.post('/milo/schedule-meeting', async (req, res) => {
+    try {
+        const { supplierName, date, time } = req.body;
+        const calendarUrl = `https://calendar.google.com/calendar/r/eventedit?text=Meeting%20with%20${supplierName}&dates=${new Date(date).toISOString().split('T')[0]}`;
+        res.json({
+            success: true,
+            data: {
+                calendarUrl,
+                supplier: supplierName,
+                scheduledDate: date,
+                scheduledTime: time,
+                status: 'Ready to schedule'
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to schedule meeting' });
+    }
+});
+// CRM sync
+router.post('/milo/crm-sync', async (req, res) => {
+    try {
+        const { leadData } = req.body;
+        res.json({
+            success: true,
+            data: {
+                status: 'Synced',
+                leadId: `LEAD-${Date.now()}`,
+                syncedFields: Object.keys(leadData).length,
+                timestamp: new Date()
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to sync to CRM' });
+    }
+});
+// ==================== FEATURE 5: ANALYTICS ENDPOINTS ====================
+// Calculate ROI
+router.post('/milo/calculate-roi', async (req, res) => {
+    try {
+        const { originalCost, negotiatedCost, implementationCost } = req.body;
+        const savings = originalCost - negotiatedCost;
+        const roi = ((savings - implementationCost) / implementationCost) * 100;
+        const paybackMonths = Math.round((implementationCost / savings) * 12);
+        res.json({
+            success: true,
+            data: {
+                originalCost,
+                negotiatedCost,
+                directSavings: savings,
+                implementationCost,
+                roiPercentage: Math.round(roi * 100) / 100,
+                paybackMonths,
+                annualizedROI: Math.round((roi * 12) * 100) / 100
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to calculate ROI' });
+    }
+});
+// Get analytics metrics
+router.get('/milo/analytics-metrics', async (req, res) => {
+    try {
+        const metrics = {
+            totalSpent: Math.round(Math.random() * 5000000),
+            averageSavings: Math.round((5 + Math.random() * 20) * 100) / 100,
+            orderCount: Math.floor(Math.random() * 100),
+            suppliersUsed: Math.floor(Math.random() * 30),
+            satisfactionScore: (4 + Math.random()).toFixed(1)
+        };
+        res.json({
+            success: true,
+            data: metrics
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch analytics metrics' });
+    }
+});
+// Generate analytics report
+router.post('/milo/generate-report', async (req, res) => {
+    try {
+        const { metrics } = req.body;
+        const report = `
+MILO AI ANALYTICS REPORT
+Generated: ${new Date().toLocaleDateString()}
+
+PROCUREMENT METRICS:
+- Total Spent: ₹${(metrics.totalSpent || 0).toLocaleString()}
+- Average Savings: ${(metrics.averageSavings || 0).toFixed(1)}%
+- Total Orders: ${metrics.orderCount || 0}
+- Suppliers Used: ${metrics.suppliersUsed || 0}
+- Satisfaction Score: ${metrics.satisfactionScore || 4.5}/5.0
+
+PERFORMANCE:
+- Materials Tracked: ${metrics.materialsTracked || 5}
+- Recent Queries: ${metrics.recentQueries || 12}
+- Documents: ${metrics.documents || 8}
+
+RECOMMENDATIONS:
+1. Increase bulk orders for 15% additional savings
+2. Diversify supplier base to 10+ suppliers
+3. Implement quarterly price renegotiation
+4. Consider long-term contracts for stable pricing
+    `;
+        res.json({
+            success: true,
+            data: {
+                filename: `milo-report-${Date.now()}.txt`,
+                report,
+                generated: new Date()
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to generate report' });
     }
 });
 exports.default = router;

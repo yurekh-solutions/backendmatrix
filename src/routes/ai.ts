@@ -4,8 +4,411 @@ import Product from '../models/Product';
 import AutoReply from '../models/AutoReply';
 import Lead from '../models/Lead';
 import OrderAutomation from '../models/OrderAutomation';
+import Supplier from '../models/Supplier';
+import RFQ from '../models/RFQ';
 
 const router = express.Router();
+
+// ==================== MILO AI TRAINING DATA ====================
+
+// Get comprehensive training data for Milo AI
+router.get('/milo/training-data', async (req: any, res) => {
+  try {
+    // Fetch all products with supplier info
+    const products = await Product.find({ status: 'active' }).populate('supplierId', 'companyName email phone businessType').limit(500);
+    
+    // Fetch all suppliers
+    const suppliers = await Supplier.find({ status: 'approved' }).select('companyName email phone address businessDescription productsOffered yearsInBusiness');
+    
+    // Get market trending products (by inquiry count)
+    const rfqs = await RFQ.find().select('productCategory quantity supplierResponse').limit(200);
+    
+    // Calculate hot/demanded products
+    const productDemand: Record<string, number> = {};
+    rfqs.forEach(rfq => {
+      const category = rfq.productCategory || 'Other';
+      productDemand[category] = (productDemand[category] || 0) + 1;
+    });
+    
+    const hotProducts = Object.entries(productDemand)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([category, demand]) => ({ category, demandCount: demand }));
+    
+    // Aggregate supplier expertise
+    const supplierExpertise: Record<string, string[]> = {};
+    suppliers.forEach(supplier => {
+      const key = supplier._id.toString();
+      supplierExpertise[key] = supplier.productsOffered || [];
+    });
+    
+    // Product categories with average pricing
+    const categoryStats: Record<string, any> = {};
+    products.forEach(product => {
+      const cat = product.category || 'Other';
+      if (!categoryStats[cat]) {
+        categoryStats[cat] = {
+          category: cat,
+          avgPrice: 0,
+          count: 0,
+          suppliers: new Set(),
+          demandCount: productDemand[cat] || 0
+        };
+      }
+      categoryStats[cat].count += 1;
+      categoryStats[cat].avgPrice += product.price?.amount || 0;
+      categoryStats[cat].suppliers.add(product.supplierId._id.toString());
+    });
+    
+    // Calculate averages
+    Object.keys(categoryStats).forEach(cat => {
+      categoryStats[cat].avgPrice = Math.round(categoryStats[cat].avgPrice / categoryStats[cat].count);
+      categoryStats[cat].supplierCount = categoryStats[cat].suppliers.size;
+      delete categoryStats[cat].suppliers;
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        trainingData: {
+          totalProducts: products.length,
+          totalSuppliers: suppliers.length,
+          totalRFQsAnalyzed: rfqs.length,
+          hotProducts: hotProducts,
+          categoryStats: Object.values(categoryStats),
+          marketInsights: {
+            mostDemandedCategory: hotProducts[0]?.category || 'Cement',
+            suppliersCount: suppliers.length,
+            activeProductsCount: products.length,
+            avgSuppliersPerCategory: Math.round(suppliers.length / Object.keys(categoryStats).length)
+          }
+        },
+        products: products.slice(0, 100).map(p => ({
+          id: p._id,
+          name: p.name,
+          category: p.category,
+          supplier: typeof p.supplierId === 'object' && p.supplierId !== null ? (p.supplierId as any).companyName : 'Unknown',
+          price: p.price?.amount,
+          inStock: p.stock?.available
+        })),
+        suppliers: suppliers.map(s => ({
+          id: s._id,
+          name: s.companyName,
+          email: s.email,
+          phone: s.phone,
+          businessType: s.businessType,
+          yearsInBusiness: s.yearsInBusiness,
+          specialties: s.productsOffered
+        })),
+        hotDemandedProducts: hotProducts
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch training data',
+      error: error.message
+    });
+  }
+});
+
+// Get product intelligence for Milo
+router.get('/milo/product-intelligence', async (req: any, res) => {
+  try {
+    const { category, searchTerm } = req.query;
+    
+    let query: any = { status: 'active' };
+    if (category) query.category = { $regex: category, $options: 'i' };
+    
+    const products = await Product.find(query)
+      .populate('supplierId', 'companyName email phone')
+      .select('name category description price stock specifications')
+      .limit(50);
+    
+    // Get related RFQs to understand demand
+    let rfqQuery: any = {};
+    if (category) rfqQuery.productCategory = { $regex: category, $options: 'i' };
+    
+    const relatedRFQs = await RFQ.find(rfqQuery).select('productCategory quantity supplierResponse status').limit(30);
+    
+    // Calculate intelligence
+    const demandLevel = relatedRFQs.length > 20 ? 'High' : relatedRFQs.length > 10 ? 'Medium' : 'Low';
+    const avgBudget = relatedRFQs.length > 0 
+      ? Math.round(relatedRFQs.filter((r: any) => r.supplierResponse?.quotedPrice).reduce((sum, r: any) => sum + (r.supplierResponse?.quotedPrice || 0), 0) / relatedRFQs.length)
+      : 0;
+    
+    res.json({
+      success: true,
+      data: {
+        categoryIntelligence: {
+          category: category || 'All Categories',
+          productCount: products.length,
+          supplierCount: new Set(products.map(p => p.supplierId._id.toString())).size,
+          demandLevel: demandLevel,
+          avgBudget: avgBudget,
+          totalRFQsInCategory: relatedRFQs.length,
+          priceRange: products.length > 0 ? {
+            min: Math.min(...products.map(p => p.price?.amount || 0)),
+            max: Math.max(...products.map(p => p.price?.amount || 0)),
+            avg: Math.round(products.reduce((sum, p) => sum + (p.price?.amount || 0), 0) / products.length)
+          } : null
+        },
+        products: products.slice(0, 20),
+        relatedRFQs: relatedRFQs.slice(0, 10)
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch product intelligence',
+      error: error.message
+    });
+  }
+});
+
+// Get supplier matching for buyer inquiries
+router.get('/milo/find-suppliers', async (req: any, res) => {
+  try {
+    const { productCategory, budget, quantity } = req.query;
+    
+    // Find relevant suppliers
+    const suppliers = await Supplier.find({
+      status: 'approved',
+      productsOffered: { $regex: productCategory || '', $options: 'i' }
+    }).limit(20);
+    
+    // Find products in this category
+    const products = await Product.find({
+      status: 'active',
+      category: { $regex: productCategory || '', $options: 'i' }
+    }).populate('supplierId', 'companyName email phone businessType yearsInBusiness');
+    
+    // Filter by budget if provided
+    let filteredProducts = products;
+    if (budget) {
+      const maxBudget = parseInt(budget);
+      filteredProducts = products.filter(p => (p.price?.amount || 0) <= maxBudget);
+    }
+    
+    // Score suppliers based on product availability and price competitiveness
+    const supplierScores = suppliers.map(supplier => {
+      const supplierProducts = filteredProducts.filter(p => p.supplierId._id.toString() === supplier._id.toString());
+      const avgPrice = supplierProducts.length > 0
+        ? Math.round(supplierProducts.reduce((sum, p) => sum + (p.price?.amount || 0), 0) / supplierProducts.length)
+        : 0;
+      
+      return {
+        id: supplier._id,
+        name: supplier.companyName,
+        email: supplier.email,
+        phone: supplier.phone,
+        businessType: supplier.businessType,
+        yearsInBusiness: supplier.yearsInBusiness,
+        matchScore: supplierProducts.length > 0 ? Math.min(100, 60 + (supplierProducts.length * 5)) : 0,
+        productCount: supplierProducts.length,
+        avgPrice: avgPrice,
+        specialties: supplier.productsOffered
+      };
+    });
+    
+    // Sort by match score
+    supplierScores.sort((a, b) => b.matchScore - a.matchScore);
+    
+    res.json({
+      success: true,
+      data: {
+        query: {
+          productCategory: productCategory || 'Any',
+          budget: budget || 'Any',
+          quantity: quantity || 'Any'
+        },
+        matchedSuppliers: supplierScores.slice(0, 15),
+        topSupplier: supplierScores[0] || null,
+        totalMatches: supplierScores.filter(s => s.matchScore > 0).length
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to find suppliers',
+      error: error.message
+    });
+  }
+});
+
+// Get market trends and hot products
+router.get('/milo/market-trends', async (req: any, res) => {
+  try {
+    const rfqs = await RFQ.find({}).select('productCategory quantity supplierResponse status createdAt').limit(500);
+    
+    // Analyze trends
+    const trends: Record<string, any> = {};
+    const pricePoints: Record<string, number[]> = {};
+    
+    rfqs.forEach(rfq => {
+      const category = rfq.productCategory || 'Other';
+      if (!trends[category]) {
+        trends[category] = {
+          category,
+          inquiries: 0,
+          avgQuantity: 0,
+          avgBudget: 0,
+          recentInquiries: 0
+        };
+        pricePoints[category] = [];
+      }
+      
+      trends[category].inquiries += 1;
+      trends[category].avgQuantity += rfq.quantity || 0;
+      const rfqPrice = (rfq as any).supplierResponse?.quotedPrice || 0;
+      trends[category].avgBudget += rfqPrice;
+      
+      // Count recent inquiries (last 7 days)
+      const daysSince = Math.floor((Date.now() - new Date(rfq.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSince <= 7) trends[category].recentInquiries += 1;
+      
+      if (rfqPrice) pricePoints[category].push(rfqPrice);
+    });
+    
+    // Calculate averages
+    Object.keys(trends).forEach(cat => {
+      trends[cat].avgQuantity = Math.round(trends[cat].avgQuantity / trends[cat].inquiries);
+      trends[cat].avgBudget = Math.round(trends[cat].avgBudget / trends[cat].inquiries);
+      trends[cat].demandTrend = trends[cat].recentInquiries > trends[cat].inquiries / 5 ? 'Rising' : 'Stable';
+    });
+    
+    const trendArray = Object.values(trends)
+      .sort((a: any, b: any) => b.inquiries - a.inquiries)
+      .slice(0, 20);
+    
+    res.json({
+      success: true,
+      data: {
+        topDemandedProducts: trendArray.slice(0, 5),
+        allTrends: trendArray,
+        insights: {
+          mostHotProduct: trendArray[0]?.category || 'Cement',
+          trendingNow: trendArray.filter((t: any) => t.demandTrend === 'Rising').slice(0, 5),
+          totalCategoriesTracked: trendArray.length
+        }
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch market trends',
+      error: error.message
+    });
+  }
+});
+
+// ==================== MILO AI CONVERSATION TRAINING ====================
+
+// Train Milo on conversation patterns and buyer/supplier needs
+router.post('/milo/train-conversation', async (req: any, res) => {
+  try {
+    const { userMessage, userType, category, budget, quantity } = req.body;
+    
+    // Analyze user query type
+    const queryType = analyzeQueryType(userMessage, userType);
+    
+    // Get relevant context based on query
+    let relevantData: any = {};
+    
+    if (queryType.includes('price') || queryType.includes('supplier')) {
+      // Get supplier matching
+      const suppliers = await Supplier.find({
+        status: 'approved',
+        productsOffered: { $regex: category || '', $options: 'i' }
+      }).limit(10);
+      
+      const products = await Product.find({
+        status: 'active',
+        category: { $regex: category || '', $options: 'i' }
+      }).populate('supplierId', 'companyName email phone');
+      
+      relevantData.suppliers = suppliers;
+      relevantData.products = products;
+    }
+    
+    if (queryType.includes('demand') || queryType.includes('trend')) {
+      // Get market trends
+      const rfqs = await RFQ.find({
+        productCategory: { $regex: category || '', $options: 'i' }
+      }).select('quantity supplierResponse createdAt').limit(50);
+      
+      relevantData.demandTrend = rfqs.length > 0 ? 'High' : 'Moderate';
+      relevantData.recentInquiries = rfqs.length;
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        message: userMessage,
+        queryType: queryType,
+        userType: userType,
+        relevantContext: relevantData,
+        suggestedResponse: generateMiloResponse(queryType, userType, relevantData)
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to train conversation',
+      error: error.message
+    });
+  }
+});
+
+// Helper function to analyze query type
+function analyzeQueryType(message: string, userType: string): string[] {
+  const lowerMsg = message.toLowerCase();
+  const types: string[] = [];
+  
+  if (lowerMsg.includes('price') || lowerMsg.includes('cost') || lowerMsg.includes('quote')) types.push('price');
+  if (lowerMsg.includes('supplier') || lowerMsg.includes('vendor')) types.push('supplier');
+  if (lowerMsg.includes('demand') || lowerMsg.includes('popular')) types.push('demand');
+  if (lowerMsg.includes('trend') || lowerMsg.includes('market')) types.push('trend');
+  if (lowerMsg.includes('rfq') || lowerMsg.includes('request')) types.push('rfq');
+  if (lowerMsg.includes('delivery') || lowerMsg.includes('shipping')) types.push('delivery');
+  if (lowerMsg.includes('quantity') || lowerMsg.includes('bulk')) types.push('quantity');
+  
+  // Default if no specific type found
+  if (types.length === 0) types.push('general');
+  
+  return types;
+}
+
+// Helper function to generate context-aware response
+function generateMiloResponse(queryTypes: string[], userType: string, context: any): string {
+  let response = '';
+  
+  if (queryTypes.includes('price') && context.products) {
+    response += `Found ${context.products.length} products in this category. `;
+    if (context.products.length > 0) {
+      const avgPrice = Math.round(
+        context.products.reduce((sum: number, p: any) => sum + (p.price?.amount || 0), 0) / context.products.length
+      );
+      response += `Average price: ₹${avgPrice}. `;
+    }
+  }
+  
+  if (queryTypes.includes('supplier') && context.suppliers) {
+    response += `I found ${context.suppliers.length} verified suppliers. `;
+  }
+  
+  if (queryTypes.includes('demand')) {
+    response += `Demand level: ${context.demandTrend}. Recent inquiries: ${context.recentInquiries}. `;
+  }
+  
+  if (response === '') {
+    response = userType === 'buyer' 
+      ? 'I can help you find suppliers, get pricing, and create RFQs for any construction material. What are you looking for?'
+      : 'I can help you list products, manage inquiries, and grow your supplier business. What would you like to do?';
+  }
+  
+  return response;
+}
 
 // AI supplier insights endpoint
 router.get('/supplier-insights', supplierAuth, async (req: any, res) => {

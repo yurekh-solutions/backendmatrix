@@ -16,7 +16,7 @@ import categoryRoutes from './routes/category';
 import aiRoutes from './routes/ai';
 import automationRoutes from './routes/automation';
 import adminAutomationRoutes from './routes/adminAutomation';
-import miloRoutes from './routes/milo';
+import miloGuideRoutes from './routes/miloGuide';
 
 // Load environment variables
 dotenv.config();
@@ -77,7 +77,7 @@ app.use('/api/tracking', trackingRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/automation', automationRoutes);
-app.use('/api/milo', miloRoutes);
+app.use('/api/milo/guide', miloGuideRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
