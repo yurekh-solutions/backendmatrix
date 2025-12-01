@@ -66,17 +66,21 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       try {
         // Cloudinary returns the secure URL in req.file.path
         imageUrl = (req.file as any).path || '';
+        console.log('✅ Image uploaded to Cloudinary:', imageUrl);
         
         // Fallback: construct URL from filename if path not available
         if (!imageUrl && (req.file as any).filename) {
           const apiUrl = process.env.API_URL || 'http://localhost:5000';
           imageUrl = `${apiUrl}/uploads/${(req.file as any).filename}`;
+          console.log('⚠️  Using fallback image URL:', imageUrl);
         }
       } catch (error) {
         console.warn('Image upload failed, continuing without image:', error);
         // Don't fail the entire product submission if image upload fails
         imageUrl = '';
       }
+    } else {
+      console.log('⚠️  No image file provided in request');
     }
 
     // Handle custom category request
@@ -219,6 +223,9 @@ export const getSupplierProducts = async (req: AuthRequest, res: Response) => {
           // Cloudinary URLs already start with https:// so they pass through unchanged
           productObj.image = cleanPath;
         }
+      } else {
+        // Log empty images for debugging
+        console.log(`Product "${productObj.name}" has no image`);
       }
       return productObj;
     });
