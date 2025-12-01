@@ -185,6 +185,8 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       status: 'pending', // Admin approval required
     };
 
+    console.log(`💾 Saving product: "${name}" with image: "${imageUrl}"`);
+
     const product = new Product(productData);
     await product.save();
 

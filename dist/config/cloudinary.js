@@ -27,9 +27,13 @@ const isCloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME &&
     process.env.CLOUDINARY_API_KEY !== 'your_api_key_here';
 if (isCloudinaryConfigured) {
     console.log('✅ Cloudinary configured - Using cloud storage for product images');
+    console.log(`   Cloud Name: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+    console.log(`   API Key: ${process.env.CLOUDINARY_API_KEY?.substring(0, 10)}...`);
 }
 else {
     console.warn('⚠️  Cloudinary not configured - Using local storage for uploads');
+    console.log(`   CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+    console.log(`   CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY}`);
 }
 let cloudinaryStorage;
 if (isCloudinaryConfigured) {

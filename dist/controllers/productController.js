@@ -159,6 +159,7 @@ const addProduct = async (req, res) => {
             },
             status: 'pending', // Admin approval required
         };
+        console.log(`💾 Saving product: "${name}" with image: "${imageUrl}"`);
         const product = new Product_1.default(productData);
         await product.save();
         res.status(201).json({
