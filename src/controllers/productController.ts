@@ -210,24 +210,31 @@ export const getSupplierProducts = async (req: AuthRequest, res: Response) => {
     const supplierId = req.supplier._id;
     const products = await Product.find({ supplierId }).sort({ createdAt: -1 });
 
-    // Get localhost API URL for local image serving
-    const apiUrl = 'http://localhost:5000';
+    console.log(`\n📦 Fetching ${products.length} products for supplier ${supplierId}`);
+
     const productsWithFullImageUrls = products.map(product => {
       const productObj = product.toObject();
+      console.log(`  📸 ${productObj.name}:`);
+      console.log(`     Raw image from DB: "${productObj.image}"`);
+      console.log(`     Image is empty: ${!productObj.image}`);
+      
       if (productObj.image) {
         // First sanitize the image path (remove filesystem paths)
         const cleanPath = sanitizeImagePath(productObj.image);
+        console.log(`     After sanitize: "${cleanPath}"`);
+        
         // Then ensure it's absolute
         if (!cleanPath.startsWith('http')) {
           // For local paths, use localhost
-          productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+          productObj.image = `http://localhost:5000${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+          console.log(`     Final URL (local): "${productObj.image}"`);
         } else {
           // Cloudinary URLs already start with https:// so they pass through unchanged
           productObj.image = cleanPath;
+          console.log(`     Final URL (Cloudinary): "${productObj.image}"`);
         }
       } else {
-        // Log empty images for debugging
-        console.log(`Product "${productObj.name}" has no image`);
+        console.log(`     No image field in database`);
       }
       return productObj;
     });
