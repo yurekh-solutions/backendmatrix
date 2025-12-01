@@ -84,6 +84,34 @@ app.use('/api/categories', category_1.default);
 app.use('/api/ai', ai_1.default);
 app.use('/api/automation', automation_1.default);
 app.use('/api/milo/guide', miloGuide_1.default);
+// Proxy endpoint for Cloudinary images (helps with localhost image loading)
+app.get('/api/image-proxy', async (req, res) => {
+    try {
+        const imageUrl = req.query.url;
+        if (!imageUrl) {
+            return res.status(400).json({ error: 'No image URL provided' });
+        }
+        // Only allow Cloudinary URLs for security
+        if (!imageUrl.includes('cloudinary.com') && !imageUrl.includes('res.cloudinary')) {
+            return res.status(403).json({ error: 'Only Cloudinary URLs are allowed' });
+        }
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+            return res.status(response.status).json({ error: 'Failed to fetch image' });
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const contentType = response.headers.get('content-type');
+        res.setHeader('Content-Type', contentType || 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.send(buffer);
+    }
+    catch (error) {
+        console.error('❌ Image proxy error:', error.message);
+        res.status(500).json({ error: 'Failed to proxy image' });
+    }
+});
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
