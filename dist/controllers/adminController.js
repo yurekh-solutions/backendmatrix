@@ -8,6 +8,24 @@ const Supplier_1 = __importDefault(require("../models/Supplier"));
 const Product_1 = __importDefault(require("../models/Product"));
 const email_1 = require("../config/email");
 const emailTemplates_1 = require("../utils/emailTemplates");
+/**
+ * Sanitize image URLs by removing filesystem paths
+ * Converts paths like /opt/render/project/src/uploads/image.jpg to /uploads/image.jpg
+ */
+const sanitizeImagePath = (imagePath) => {
+    if (!imagePath)
+        return '';
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+    }
+    // Remove filesystem path prefix if present
+    if (imagePath.includes('/uploads/')) {
+        const uploadsIndex = imagePath.indexOf('/uploads/');
+        return imagePath.substring(uploadsIndex);
+    }
+    return imagePath;
+};
 const getPendingSuppliers = async (req, res) => {
     try {
         const suppliers = await Supplier_1.default.find({ status: 'pending' })
@@ -195,9 +213,26 @@ const getAllProducts = async (req, res) => {
             .limit(Number(limit))
             .skip((Number(page) - 1) * Number(limit));
         const total = await Product_1.default.countDocuments(query);
+        // Convert relative image paths to absolute URLs
+        const apiUrl = process.env.API_URL || 'http://localhost:5000';
+        const productsWithFullImageUrls = products.map(product => {
+            const productObj = product.toObject();
+            if (productObj.image) {
+                // First sanitize the image path (remove filesystem paths)
+                const cleanPath = sanitizeImagePath(productObj.image);
+                // Then ensure it's absolute
+                if (!cleanPath.startsWith('http')) {
+                    productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+                }
+                else {
+                    productObj.image = cleanPath;
+                }
+            }
+            return productObj;
+        });
         res.json({
             success: true,
-            data: products,
+            data: productsWithFullImageUrls,
             pagination: {
                 total,
                 page: Number(page),

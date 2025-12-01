@@ -44,24 +44,41 @@ const addProduct = async (req, res) => {
         let imageUrl = '';
         if (req.file) {
             try {
-                // Cloudinary returns the secure URL in req.file.path
-                imageUrl = req.file.path || '';
-                console.log('✅ Image uploaded to Cloudinary:', imageUrl);
-                // Fallback: construct URL from filename if path not available
+                console.log('📸 Image file received:', {
+                    fieldname: req.file.fieldname,
+                    originalname: req.file.originalname,
+                    mimetype: req.file.mimetype,
+                    size: req.file.size,
+                    path: req.file.path,
+                    filename: req.file.filename,
+                    secure_url: req.file.secure_url, // Cloudinary secure URL
+                    cloudinary: req.file.cloudinary,
+                });
+                // Cloudinary returns URLs in different possible locations
+                // Try multiple sources to ensure we get the URL
+                imageUrl = req.file.path ||
+                    req.file.secure_url ||
+                    req.file.url || '';
+                // If still no URL but we have filename, construct it
                 if (!imageUrl && req.file.filename) {
                     const apiUrl = process.env.API_URL || 'http://localhost:5000';
                     imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
-                    console.log('⚠️  Using fallback image URL:', imageUrl);
+                }
+                // Log the final URL
+                console.log('✅ Final image URL:', imageUrl);
+                // If we still don't have a URL, log error but continue
+                if (!imageUrl) {
+                    console.warn('⚠️  Warning: Image uploaded but URL could not be extracted');
                 }
             }
             catch (error) {
-                console.warn('Image upload failed, continuing without image:', error);
+                console.warn('Image upload processing failed, continuing without image:', error);
                 // Don't fail the entire product submission if image upload fails
                 imageUrl = '';
             }
         }
         else {
-            console.log('⚠️  No image file provided in request');
+            console.warn('⚠️ No image file received in request');
         }
         // Handle custom category request
         if (customCategory) {
@@ -159,7 +176,6 @@ const addProduct = async (req, res) => {
             },
             status: 'pending', // Admin approval required
         };
-        console.log(`💾 Saving product: "${name}" with image: "${imageUrl}"`);
         const product = new Product_1.default(productData);
         await product.save();
         res.status(201).json({
@@ -182,32 +198,20 @@ const getSupplierProducts = async (req, res) => {
     try {
         const supplierId = req.supplier._id;
         const products = await Product_1.default.find({ supplierId }).sort({ createdAt: -1 });
-        console.log(`\n📦 Fetching ${products.length} products for supplier ${supplierId}`);
+        // No need to modify Cloudinary URLs - they're already absolute
+        // Only convert old relative paths if they exist
+        const apiUrl = process.env.API_URL || 'http://localhost:5000';
         const productsWithFullImageUrls = products.map(product => {
             const productObj = product.toObject();
-            console.log(`  📸 ${productObj.name}:`);
-            console.log(`     Raw image from DB: "${productObj.image}"`);
-            console.log(`     Image is empty: ${!productObj.image}`);
-            if (productObj.image) {
-                // First sanitize the image path (remove filesystem paths)
-                const cleanPath = sanitizeImagePath(productObj.image);
-                console.log(`     After sanitize: "${cleanPath}"`);
-                // Then ensure it's absolute
-                if (!cleanPath.startsWith('http')) {
-                    // Local path - DON'T construct URL as it won't work on other environments
-                    // Instead, return empty to show placeholder
-                    console.log(`     ⚠️  Local file path detected - cannot use across environments`);
-                    productObj.image = '';
-                }
-                else {
-                    // Cloudinary URLs already start with https:// so they pass through unchanged
-                    productObj.image = cleanPath;
-                    console.log(`     Final URL (Cloudinary): "${productObj.image}"`);
-                }
+            // Ensure image field exists (even if empty)
+            if (!productObj.image) {
+                productObj.image = ''; // Set empty string instead of undefined
             }
-            else {
-                console.log(`     No image field in database`);
+            else if (!productObj.image.startsWith('http')) {
+                // If it's a relative path (old upload), make it absolute
+                productObj.image = `${apiUrl}${productObj.image}`;
             }
+            // Cloudinary URLs already start with https:// so they pass through unchanged
             return productObj;
         });
         res.json({
@@ -298,7 +302,11 @@ const getAllProducts = async (req, res) => {
         const apiUrl = process.env.API_URL || 'http://localhost:5000';
         const productsWithFullImageUrls = products.map(product => {
             const productObj = product.toObject();
-            if (productObj.image) {
+            // Ensure image field exists (even if empty)
+            if (!productObj.image) {
+                productObj.image = ''; // Set empty string instead of undefined
+            }
+            else {
                 // First sanitize the image path (remove filesystem paths)
                 const cleanPath = sanitizeImagePath(productObj.image);
                 // Then ensure it's absolute
@@ -338,7 +346,11 @@ const getProductById = async (req, res) => {
         }
         // Convert relative image path to absolute URL
         const productObj = product.toObject();
-        if (productObj.image) {
+        // Ensure image field exists (even if empty)
+        if (!productObj.image) {
+            productObj.image = ''; // Set empty string instead of undefined
+        }
+        else {
             // First sanitize the image path (remove filesystem paths)
             const cleanPath = sanitizeImagePath(productObj.image);
             // Then ensure it's absolute

@@ -30,10 +30,30 @@ const miloGuide_1 = __importDefault(require("./routes/miloGuide"));
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 // Middleware
-// CORS configuration with file upload support
-// Force redeploy to apply CORS changes
+// CORS configuration with proper origin whitelist
+const allowedOrigins = [
+    'https://supplierportal-mu.vercel.app', // Supplier Portal - Production
+    'https://admin-panel-ritzyard.vercel.app', // Admin Panel - Production
+    'http://localhost:5173', // Vite dev - Supplier Portal
+    'http://localhost:3002', // Vite dev - Admin Panel
+    'http://localhost:8080', // Vite dev - Alternative
+    'http://127.0.0.1:5173', // localhost variations
+    'http://127.0.0.1:3002',
+    'http://127.0.0.1:8080',
+];
 app.use((0, cors_1.default)({
-    origin: true, // Allow all origins temporarily for debugging
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl requests, etc)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        }
+        else {
+            console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-API-Key'],
@@ -67,7 +87,10 @@ app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../
 // Routes
 // Explicitly handle preflight requests for all routes
 app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', 'https://supplierportal-mu.vercel.app');
+    const origin = req.headers.origin || '';
+    if (allowedOrigins.includes(origin) || !origin) {
+        res.header('Access-Control-Allow-Origin', origin || 'http://localhost:5173');
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-API-Key');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -84,41 +107,6 @@ app.use('/api/categories', category_1.default);
 app.use('/api/ai', ai_1.default);
 app.use('/api/automation', automation_1.default);
 app.use('/api/milo/guide', miloGuide_1.default);
-// Proxy endpoint for Cloudinary images (helps with localhost image loading)
-app.get('/api/image-proxy', async (req, res) => {
-    try {
-        const imageUrl = req.query.url;
-        console.log(`\n📋 Image Proxy Request:`);
-        console.log(`   URL: ${imageUrl?.substring(0, 80)}...`);
-        if (!imageUrl) {
-            console.log(`   ❌ No image URL provided`);
-            return res.status(400).json({ error: 'No image URL provided' });
-        }
-        // Only allow Cloudinary URLs for security
-        if (!imageUrl.includes('cloudinary.com') && !imageUrl.includes('res.cloudinary')) {
-            console.log(`   ❌ Not a Cloudinary URL`);
-            return res.status(403).json({ error: 'Only Cloudinary URLs are allowed' });
-        }
-        console.log(`   ✅ Cloudinary URL detected, proxying...`);
-        const response = await fetch(imageUrl);
-        if (!response.ok) {
-            console.log(`   ❌ Fetch failed: ${response.status}`);
-            return res.status(response.status).json({ error: 'Failed to fetch image' });
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const contentType = response.headers.get('content-type');
-        console.log(`   ✅ Success: ${buffer.length} bytes (${contentType})`);
-        res.setHeader('Content-Type', contentType || 'image/jpeg');
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.send(buffer);
-    }
-    catch (error) {
-        console.error(`❌ Image proxy error: ${error.message}`);
-        res.status(500).json({ error: 'Failed to proxy image' });
-    }
-});
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({

@@ -31,10 +31,30 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-// CORS configuration with file upload support
-// Force redeploy to apply CORS changes
+// CORS configuration with proper origin whitelist
+const allowedOrigins = [
+  'https://supplierportal-mu.vercel.app',      // Supplier Portal - Production
+  'https://admin-panel-ritzyard.vercel.app',   // Admin Panel - Production
+  'http://localhost:5173',                      // Vite dev - Supplier Portal
+  'http://localhost:3002',                      // Vite dev - Admin Panel
+  'http://localhost:8080',                      // Vite dev - Alternative
+  'http://127.0.0.1:5173',                      // localhost variations
+  'http://127.0.0.1:3002',
+  'http://127.0.0.1:8080',
+];
+
 app.use(cors({
-  origin: true, // Allow all origins temporarily for debugging
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl requests, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-API-Key'],
@@ -66,7 +86,10 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
 // Routes
 // Explicitly handle preflight requests for all routes
 app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'https://supplierportal-mu.vercel.app');
+  const origin = req.headers.origin || '';
+  if (allowedOrigins.includes(origin) || !origin) {
+    res.header('Access-Control-Allow-Origin', origin || 'http://localhost:5173');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, X-API-Key');
   res.header('Access-Control-Allow-Credentials', 'true');
