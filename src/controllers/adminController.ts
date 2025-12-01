@@ -8,6 +8,27 @@ interface AuthRequest extends Request {
   admin?: any;
 }
 
+/**
+ * Sanitize image URLs by removing filesystem paths
+ * Converts paths like /opt/render/project/src/uploads/image.jpg to /uploads/image.jpg
+ */
+const sanitizeImagePath = (imagePath: string): string => {
+  if (!imagePath) return '';
+  
+  // If it's already a full URL, return as-is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Remove filesystem path prefix if present
+  if (imagePath.includes('/uploads/')) {
+    const uploadsIndex = imagePath.indexOf('/uploads/');
+    return imagePath.substring(uploadsIndex);
+  }
+  
+  return imagePath;
+};
+
 export const getPendingSuppliers = async (req: AuthRequest, res: Response) => {
   try {
     const suppliers = await Supplier.find({ status: 'pending' })
@@ -212,9 +233,26 @@ export const getAllProducts = async (req: AuthRequest, res: Response) => {
     
     const total = await Product.countDocuments(query);
     
+    // Convert relative image paths to absolute URLs
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const productsWithFullImageUrls = products.map(product => {
+      const productObj = product.toObject();
+      if (productObj.image) {
+        // First sanitize the image path (remove filesystem paths)
+        const cleanPath = sanitizeImagePath(productObj.image);
+        // Then ensure it's absolute
+        if (!cleanPath.startsWith('http')) {
+          productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+        } else {
+          productObj.image = cleanPath;
+        }
+      }
+      return productObj;
+    });
+    
     res.json({
       success: true,
-      data: products,
+      data: productsWithFullImageUrls,
       pagination: {
         total,
         page: Number(page),

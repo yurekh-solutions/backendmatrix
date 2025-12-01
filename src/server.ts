@@ -12,6 +12,7 @@ if (dotenvResult.error) {
 // NOW import modules that depend on env variables
 import { connectDB } from './config/database';
 import { createDefaultAdmin } from './controllers/authController';
+import cloudinary from './config/cloudinary'; // Initialize Cloudinary with env vars
 
 // Routes
 import authRoutes from './routes/auth';
@@ -83,49 +84,6 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/automation', automationRoutes);
 app.use('/api/milo/guide', miloGuideRoutes);
-
-// Proxy endpoint for Cloudinary images (helps with localhost image loading)
-app.get('/api/image-proxy', async (req: Request, res: Response) => {
-  try {
-    const imageUrl = req.query.url as string;
-    
-    console.log(`\n📋 Image Proxy Request:`);
-    console.log(`   URL: ${imageUrl?.substring(0, 80)}...`);
-    
-    if (!imageUrl) {
-      console.log(`   ❌ No image URL provided`);
-      return res.status(400).json({ error: 'No image URL provided' });
-    }
-    
-    // Only allow Cloudinary URLs for security
-    if (!imageUrl.includes('cloudinary.com') && !imageUrl.includes('res.cloudinary')) {
-      console.log(`   ❌ Not a Cloudinary URL`);
-      return res.status(403).json({ error: 'Only Cloudinary URLs are allowed' });
-    }
-    
-    console.log(`   ✅ Cloudinary URL detected, proxying...`);
-    const response = await fetch(imageUrl);
-    
-    if (!response.ok) {
-      console.log(`   ❌ Fetch failed: ${response.status}`);
-      return res.status(response.status).json({ error: 'Failed to fetch image' });
-    }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const contentType = response.headers.get('content-type');
-    
-    console.log(`   ✅ Success: ${buffer.length} bytes (${contentType})`);
-    
-    res.setHeader('Content-Type', contentType || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.send(buffer);
-  } catch (error: any) {
-    console.error(`❌ Image proxy error: ${error.message}`);
-    res.status(500).json({ error: 'Failed to proxy image' });
-  }
-});
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
