@@ -88,27 +88,34 @@ app.use('/api/milo/guide', miloGuide_1.default);
 app.get('/api/image-proxy', async (req, res) => {
     try {
         const imageUrl = req.query.url;
+        console.log(`\n📋 Image Proxy Request:`);
+        console.log(`   URL: ${imageUrl?.substring(0, 80)}...`);
         if (!imageUrl) {
+            console.log(`   ❌ No image URL provided`);
             return res.status(400).json({ error: 'No image URL provided' });
         }
         // Only allow Cloudinary URLs for security
         if (!imageUrl.includes('cloudinary.com') && !imageUrl.includes('res.cloudinary')) {
+            console.log(`   ❌ Not a Cloudinary URL`);
             return res.status(403).json({ error: 'Only Cloudinary URLs are allowed' });
         }
+        console.log(`   ✅ Cloudinary URL detected, proxying...`);
         const response = await fetch(imageUrl);
         if (!response.ok) {
+            console.log(`   ❌ Fetch failed: ${response.status}`);
             return res.status(response.status).json({ error: 'Failed to fetch image' });
         }
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const contentType = response.headers.get('content-type');
+        console.log(`   ✅ Success: ${buffer.length} bytes (${contentType})`);
         res.setHeader('Content-Type', contentType || 'image/jpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.send(buffer);
     }
     catch (error) {
-        console.error('❌ Image proxy error:', error.message);
+        console.error(`❌ Image proxy error: ${error.message}`);
         res.status(500).json({ error: 'Failed to proxy image' });
     }
 });
