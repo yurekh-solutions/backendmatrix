@@ -84,7 +84,9 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({
     success: true,
     message: 'Supplier Onboarding API is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    apiUrl: process.env.API_URL || 'not-configured'
   });
 });
 
