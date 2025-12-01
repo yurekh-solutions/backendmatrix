@@ -225,9 +225,10 @@ export const getSupplierProducts = async (req: AuthRequest, res: Response) => {
         
         // Then ensure it's absolute
         if (!cleanPath.startsWith('http')) {
-          // For local paths, use localhost
-          productObj.image = `http://localhost:5000${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
-          console.log(`     Final URL (local): "${productObj.image}"`);
+          // Local path - DON'T construct URL as it won't work on other environments
+          // Instead, return empty to show placeholder
+          console.log(`     ⚠️  Local file path detected - cannot use across environments`);
+          productObj.image = '';
         } else {
           // Cloudinary URLs already start with https:// so they pass through unchanged
           productObj.image = cleanPath;
