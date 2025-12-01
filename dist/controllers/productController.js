@@ -6,6 +6,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProductById = exports.getAllProducts = exports.deleteProduct = exports.updateProduct = exports.getSupplierProducts = exports.addProduct = void 0;
 const Product_1 = __importDefault(require("../models/Product"));
 const Category_1 = __importDefault(require("../models/Category"));
+/**
+ * Sanitize image URLs by removing filesystem paths
+ * Converts paths like /opt/render/project/src/uploads/image.jpg to /uploads/image.jpg
+ */
+const sanitizeImagePath = (imagePath) => {
+    if (!imagePath)
+        return '';
+    // If it's already a full URL, return as-is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+    }
+    // Remove filesystem path prefix if present
+    // Match patterns like /opt/render/project/src/ or similar paths
+    if (imagePath.includes('/uploads/')) {
+        // Extract just the /uploads/... part
+        const uploadsIndex = imagePath.indexOf('/uploads/');
+        return imagePath.substring(uploadsIndex);
+    }
+    return imagePath;
+};
 // Supplier: Add new product
 const addProduct = async (req, res) => {
     try {
@@ -256,8 +276,16 @@ const getAllProducts = async (req, res) => {
         const apiUrl = process.env.API_URL || 'http://localhost:5000';
         const productsWithFullImageUrls = products.map(product => {
             const productObj = product.toObject();
-            if (productObj.image && !productObj.image.startsWith('http')) {
-                productObj.image = `${apiUrl}${productObj.image}`;
+            if (productObj.image) {
+                // First sanitize the image path (remove filesystem paths)
+                const cleanPath = sanitizeImagePath(productObj.image);
+                // Then ensure it's absolute
+                if (!cleanPath.startsWith('http')) {
+                    productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+                }
+                else {
+                    productObj.image = cleanPath;
+                }
             }
             return productObj;
         });
@@ -288,9 +316,17 @@ const getProductById = async (req, res) => {
         }
         // Convert relative image path to absolute URL
         const productObj = product.toObject();
-        if (productObj.image && !productObj.image.startsWith('http')) {
-            const apiUrl = process.env.API_URL || 'http://localhost:5000';
-            productObj.image = `${apiUrl}${productObj.image}`;
+        if (productObj.image) {
+            // First sanitize the image path (remove filesystem paths)
+            const cleanPath = sanitizeImagePath(productObj.image);
+            // Then ensure it's absolute
+            if (!cleanPath.startsWith('http')) {
+                const apiUrl = process.env.API_URL || 'http://localhost:5000';
+                productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+            }
+            else {
+                productObj.image = cleanPath;
+            }
         }
         res.json({
             success: true,
