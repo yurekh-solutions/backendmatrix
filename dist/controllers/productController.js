@@ -176,16 +176,23 @@ const getSupplierProducts = async (req, res) => {
     try {
         const supplierId = req.supplier._id;
         const products = await Product_1.default.find({ supplierId }).sort({ createdAt: -1 });
-        // No need to modify Cloudinary URLs - they're already absolute
-        // Only convert old relative paths if they exist
-        const apiUrl = process.env.API_URL || 'http://localhost:5000';
+        // Get localhost API URL for local image serving
+        const apiUrl = 'http://localhost:5000';
         const productsWithFullImageUrls = products.map(product => {
             const productObj = product.toObject();
-            if (productObj.image && !productObj.image.startsWith('http')) {
-                // If it's a relative path (old upload), make it absolute
-                productObj.image = `${apiUrl}${productObj.image}`;
+            if (productObj.image) {
+                // First sanitize the image path (remove filesystem paths)
+                const cleanPath = sanitizeImagePath(productObj.image);
+                // Then ensure it's absolute
+                if (!cleanPath.startsWith('http')) {
+                    // For local paths, use localhost
+                    productObj.image = `${apiUrl}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+                }
+                else {
+                    // Cloudinary URLs already start with https:// so they pass through unchanged
+                    productObj.image = cleanPath;
+                }
             }
-            // Cloudinary URLs already start with https:// so they pass through unchanged
             return productObj;
         });
         res.json({
