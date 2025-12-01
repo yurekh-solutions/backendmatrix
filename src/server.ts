@@ -2,6 +2,14 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+
+// Load environment variables FIRST before any other imports
+const dotenvResult = dotenv.config({ path: path.join(__dirname, '../.env') });
+if (dotenvResult.error) {
+  console.warn('⚠️  .env file not found, using system environment variables');
+}
+
+// NOW import modules that depend on env variables
 import { connectDB } from './config/database';
 import { createDefaultAdmin } from './controllers/authController';
 
@@ -17,9 +25,6 @@ import aiRoutes from './routes/ai';
 import automationRoutes from './routes/automation';
 import adminAutomationRoutes from './routes/adminAutomation';
 import miloGuideRoutes from './routes/miloGuide';
-
-// Load environment variables
-dotenv.config();
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;

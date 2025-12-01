@@ -7,6 +7,12 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+// Load environment variables FIRST before any other imports
+const dotenvResult = dotenv_1.default.config({ path: path_1.default.join(__dirname, '../.env') });
+if (dotenvResult.error) {
+    console.warn('⚠️  .env file not found, using system environment variables');
+}
+// NOW import modules that depend on env variables
 const database_1 = require("./config/database");
 const authController_1 = require("./controllers/authController");
 // Routes
@@ -21,8 +27,6 @@ const ai_1 = __importDefault(require("./routes/ai"));
 const automation_1 = __importDefault(require("./routes/automation"));
 const adminAutomation_1 = __importDefault(require("./routes/adminAutomation"));
 const miloGuide_1 = __importDefault(require("./routes/miloGuide"));
-// Load environment variables
-dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 // Middleware
@@ -85,7 +89,9 @@ app.get('/api/health', (req, res) => {
     res.json({
         success: true,
         message: 'Supplier Onboarding API is running',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        apiUrl: process.env.API_URL || 'not-configured'
     });
 });
 // 404 handler

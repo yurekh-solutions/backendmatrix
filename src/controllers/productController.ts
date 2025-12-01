@@ -7,18 +7,52 @@ import { AuthRequest } from '../middleware/auth';
 export const addProduct = async (req: AuthRequest, res: Response) => {
   try {
     const supplierId = req.supplier._id;
-    const { name, category, subcategory, customCategory, customSubcategory, description } = req.body;
+    const { 
+      name, 
+      category, 
+      subcategory, 
+      customCategory, 
+      customSubcategory, 
+      description,
+      // Additional fields from frontend
+      features,
+      pricing,
+      moq,
+      leadTime,
+      materialStandard,
+      packaging,
+      testingCertificate,
+      brands,
+      grades,
+      delivery,
+      quality,
+      availability
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !category || !description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, category, and description are required',
+      });
+    }
 
     // Handle image upload from Cloudinary
     let imageUrl = '';
     if (req.file) {
-      // Cloudinary returns the secure URL in req.file.path
-      imageUrl = (req.file as any).path || '';
-      
-      // Fallback: construct URL from filename if path not available
-      if (!imageUrl && req.file.filename) {
-        const apiUrl = process.env.API_URL || 'http://localhost:5000';
-        imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
+      try {
+        // Cloudinary returns the secure URL in req.file.path
+        imageUrl = (req.file as any).path || '';
+        
+        // Fallback: construct URL from filename if path not available
+        if (!imageUrl && (req.file as any).filename) {
+          const apiUrl = process.env.API_URL || 'http://localhost:5000';
+          imageUrl = `${apiUrl}/uploads/${(req.file as any).filename}`;
+        }
+      } catch (error) {
+        console.warn('Image upload failed, continuing without image:', error);
+        // Don't fail the entire product submission if image upload fails
+        imageUrl = '';
       }
     }
 
@@ -61,6 +95,29 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Parse JSON fields if they're strings
+    let parsedFeatures = [];
+    let parsedBrands = [];
+    let parsedGrades = [];
+    
+    try {
+      parsedFeatures = typeof features === 'string' ? JSON.parse(features) : (features || []);
+    } catch (e) {
+      parsedFeatures = [];
+    }
+    
+    try {
+      parsedBrands = typeof brands === 'string' ? JSON.parse(brands) : (brands || []);
+    } catch (e) {
+      parsedBrands = [];
+    }
+    
+    try {
+      parsedGrades = typeof grades === 'string' ? JSON.parse(grades) : (grades || []);
+    } catch (e) {
+      parsedGrades = [];
+    }
+
     const productData = {
       supplierId,
       name,
@@ -70,6 +127,34 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
       customSubcategory,
       description,
       image: imageUrl,
+      features: parsedFeatures,
+      applications: parsedFeatures, // Use features as applications too
+      specifications: {
+        materialStandard: materialStandard || '',
+        packaging: packaging || '',
+        testingCertificate: testingCertificate || '',
+        brand: parsedBrands,
+        grades: parsedGrades,
+        delivery: delivery || '',
+        quality: quality || '',
+        availability: availability || '',
+      },
+      price: pricing ? {
+        amount: parseFloat(pricing) || 0,
+        currency: 'INR',
+        unit: 'unit',
+      } : {
+        amount: 0,
+        currency: 'INR',
+        unit: 'unit',
+      },
+      stock: {
+        available: true,
+        quantity: moq ? parseInt(moq) : 0,
+        minimumOrder: moq ? parseInt(moq) : 0,
+        reserved: 0,
+        lastUpdated: new Date(),
+      },
       status: 'pending', // Admin approval required
     };
 

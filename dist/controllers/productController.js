@@ -10,12 +10,33 @@ const Category_1 = __importDefault(require("../models/Category"));
 const addProduct = async (req, res) => {
     try {
         const supplierId = req.supplier._id;
-        const { name, category, subcategory, customCategory, customSubcategory, description } = req.body;
-        // Handle image upload
+        const { name, category, subcategory, customCategory, customSubcategory, description, 
+        // Additional fields from frontend
+        features, pricing, moq, leadTime, materialStandard, packaging, testingCertificate, brands, grades, delivery, quality, availability } = req.body;
+        // Validate required fields
+        if (!name || !category || !description) {
+            return res.status(400).json({
+                success: false,
+                message: 'Name, category, and description are required',
+            });
+        }
+        // Handle image upload from Cloudinary
         let imageUrl = '';
         if (req.file) {
-            const apiUrl = process.env.API_URL || 'http://localhost:5000';
-            imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
+            try {
+                // Cloudinary returns the secure URL in req.file.path
+                imageUrl = req.file.path || '';
+                // Fallback: construct URL from filename if path not available
+                if (!imageUrl && req.file.filename) {
+                    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+                    imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
+                }
+            }
+            catch (error) {
+                console.warn('Image upload failed, continuing without image:', error);
+                // Don't fail the entire product submission if image upload fails
+                imageUrl = '';
+            }
         }
         // Handle custom category request
         if (customCategory) {
@@ -52,6 +73,28 @@ const addProduct = async (req, res) => {
                 }
             }
         }
+        // Parse JSON fields if they're strings
+        let parsedFeatures = [];
+        let parsedBrands = [];
+        let parsedGrades = [];
+        try {
+            parsedFeatures = typeof features === 'string' ? JSON.parse(features) : (features || []);
+        }
+        catch (e) {
+            parsedFeatures = [];
+        }
+        try {
+            parsedBrands = typeof brands === 'string' ? JSON.parse(brands) : (brands || []);
+        }
+        catch (e) {
+            parsedBrands = [];
+        }
+        try {
+            parsedGrades = typeof grades === 'string' ? JSON.parse(grades) : (grades || []);
+        }
+        catch (e) {
+            parsedGrades = [];
+        }
         const productData = {
             supplierId,
             name,
@@ -61,6 +104,34 @@ const addProduct = async (req, res) => {
             customSubcategory,
             description,
             image: imageUrl,
+            features: parsedFeatures,
+            applications: parsedFeatures, // Use features as applications too
+            specifications: {
+                materialStandard: materialStandard || '',
+                packaging: packaging || '',
+                testingCertificate: testingCertificate || '',
+                brand: parsedBrands,
+                grades: parsedGrades,
+                delivery: delivery || '',
+                quality: quality || '',
+                availability: availability || '',
+            },
+            price: pricing ? {
+                amount: parseFloat(pricing) || 0,
+                currency: 'INR',
+                unit: 'unit',
+            } : {
+                amount: 0,
+                currency: 'INR',
+                unit: 'unit',
+            },
+            stock: {
+                available: true,
+                quantity: moq ? parseInt(moq) : 0,
+                minimumOrder: moq ? parseInt(moq) : 0,
+                reserved: 0,
+                lastUpdated: new Date(),
+            },
             status: 'pending', // Admin approval required
         };
         const product = new Product_1.default(productData);
@@ -85,14 +156,16 @@ const getSupplierProducts = async (req, res) => {
     try {
         const supplierId = req.supplier._id;
         const products = await Product_1.default.find({ supplierId }).sort({ createdAt: -1 });
-        // Convert relative image paths to absolute URLs
+        // No need to modify Cloudinary URLs - they're already absolute
+        // Only convert old relative paths if they exist
         const apiUrl = process.env.API_URL || 'http://localhost:5000';
         const productsWithFullImageUrls = products.map(product => {
             const productObj = product.toObject();
             if (productObj.image && !productObj.image.startsWith('http')) {
-                // If it's a relative path, make it absolute
+                // If it's a relative path (old upload), make it absolute
                 productObj.image = `${apiUrl}${productObj.image}`;
             }
+            // Cloudinary URLs already start with https:// so they pass through unchanged
             return productObj;
         });
         res.json({

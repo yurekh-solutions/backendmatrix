@@ -3,17 +3,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.upload = void 0;
+exports.upload = exports.uploadProductImage = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-// Ensure upload directory exists
+const cloudinary_1 = require("./cloudinary");
+// Ensure upload directory exists (for documents)
 const uploadDir = path_1.default.join(__dirname, '../../uploads');
 if (!fs_1.default.existsSync(uploadDir)) {
     fs_1.default.mkdirSync(uploadDir, { recursive: true });
 }
-// Configure storage
-const storage = multer_1.default.diskStorage({
+// Configure local storage (for documents like PDFs)
+const localStorage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir);
     },
@@ -24,8 +25,27 @@ const storage = multer_1.default.diskStorage({
         cb(null, `${name}-${uniqueSuffix}${ext}`);
     }
 });
-// File filter - Accept PDFs and images
-const fileFilter = (req, file, cb) => {
+// File filter for images (used with Cloudinary)
+const imageFilter = (req, file, cb) => {
+    const allowedExtensions = /jpg|jpeg|png|webp|gif/;
+    const extname = allowedExtensions.test(path_1.default.extname(file.originalname).toLowerCase());
+    const allowedMimeTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+        'image/gif'
+    ];
+    const mimetype = allowedMimeTypes.includes(file.mimetype);
+    if (extname && mimetype) {
+        cb(null, true);
+    }
+    else {
+        cb(new Error(`Invalid image type. Only JPG, PNG, WEBP, GIF files are allowed. Received: ${file.mimetype}`));
+    }
+};
+// File filter for documents - Accept PDFs and images
+const documentFilter = (req, file, cb) => {
     // Allowed file extensions
     const allowedExtensions = /pdf|jpg|jpeg|png|doc|docx/;
     const extname = allowedExtensions.test(path_1.default.extname(file.originalname).toLowerCase());
@@ -46,9 +66,18 @@ const fileFilter = (req, file, cb) => {
         cb(new Error(`Invalid file type. Only PDF, JPG, PNG, DOC, DOCX files are allowed. Received: ${file.mimetype}`));
     }
 };
+// Multer instance for product images (uses Cloudinary)
+exports.uploadProductImage = (0, multer_1.default)({
+    storage: cloudinary_1.cloudinaryStorage,
+    fileFilter: imageFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+});
+// Multer instance for documents (uses local storage)
 exports.upload = (0, multer_1.default)({
-    storage,
-    fileFilter,
+    storage: localStorage,
+    fileFilter: documentFilter,
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB limit
     }
