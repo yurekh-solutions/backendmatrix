@@ -9,11 +9,17 @@ export const addProduct = async (req: AuthRequest, res: Response) => {
     const supplierId = req.supplier._id;
     const { name, category, subcategory, customCategory, customSubcategory, description } = req.body;
 
-    // Handle image upload
+    // Handle image upload from Cloudinary
     let imageUrl = '';
     if (req.file) {
-      const apiUrl = process.env.API_URL || 'http://localhost:5000';
-      imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
+      // Cloudinary returns the secure URL in req.file.path
+      imageUrl = (req.file as any).path || '';
+      
+      // Fallback: construct URL from filename if path not available
+      if (!imageUrl && req.file.filename) {
+        const apiUrl = process.env.API_URL || 'http://localhost:5000';
+        imageUrl = `${apiUrl}/uploads/${req.file.filename}`;
+      }
     }
 
     // Handle custom category request
@@ -90,14 +96,16 @@ export const getSupplierProducts = async (req: AuthRequest, res: Response) => {
     const supplierId = req.supplier._id;
     const products = await Product.find({ supplierId }).sort({ createdAt: -1 });
 
-    // Convert relative image paths to absolute URLs
+    // No need to modify Cloudinary URLs - they're already absolute
+    // Only convert old relative paths if they exist
     const apiUrl = process.env.API_URL || 'http://localhost:5000';
     const productsWithFullImageUrls = products.map(product => {
       const productObj = product.toObject();
       if (productObj.image && !productObj.image.startsWith('http')) {
-        // If it's a relative path, make it absolute
+        // If it's a relative path (old upload), make it absolute
         productObj.image = `${apiUrl}${productObj.image}`;
       }
+      // Cloudinary URLs already start with https:// so they pass through unchanged
       return productObj;
     });
 
