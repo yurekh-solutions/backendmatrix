@@ -75,6 +75,10 @@ export interface ISupplier extends Document {
   password?: string;
   isActive: boolean;
   
+  // Password Reset
+  resetPasswordCode?: string;
+  resetPasswordExpiry?: number;
+  
   // Timestamps
   submittedAt: Date;
   lastModified: Date;
@@ -185,6 +189,12 @@ const supplierSchema = new Schema<ISupplier>({
   isActive: {
     type: Boolean,
     default: true
+  },
+  resetPasswordCode: {
+    type: String
+  },
+  resetPasswordExpiry: {
+    type: Number
   },
   submittedAt: {
     type: Date,
