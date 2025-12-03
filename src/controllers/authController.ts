@@ -205,12 +205,14 @@ export const createDefaultAdmin = async () => {
 
 // Generate a simple numeric code for password reset
 const generateResetCode = () => {
-  return Math.random().toString().substring(2, 8);
+  return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
 };
 
 export const forgotSupplierPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
+    
+    console.log(`🔐 Forgot password request for email: ${email}`);
     
     if (!email) {
       return res.status(400).json({
@@ -222,6 +224,7 @@ export const forgotSupplierPassword = async (req: Request, res: Response) => {
     const supplier = await Supplier.findOne({ email });
     
     if (!supplier) {
+      console.log(`⚠️ Email not found: ${email}`);
       // Don't reveal if email exists or not for security
       return res.json({
         success: true,
@@ -229,21 +232,31 @@ export const forgotSupplierPassword = async (req: Request, res: Response) => {
       });
     }
     
+    // Check if supplier is approved
+    if (supplier.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: `Your account is ${supplier.status}. Only approved suppliers can reset their password.`
+      });
+    }
+    
     // Generate reset code
     const resetCode = generateResetCode();
-    const resetCodeExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const resetCodeExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
     
     // Store reset code in supplier document
     (supplier as any).resetPasswordCode = resetCode;
     (supplier as any).resetPasswordExpiry = resetCodeExpiry;
     await supplier.save();
     
+    console.log(`✅ Reset code generated for ${email}: ${resetCode}`);
+    
     // Send email with reset code
-    const emailSubject = 'Password Reset Code - RitzYard';
+    const emailSubject = '🔐 Password Reset Code - RitzYard';
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">RitzYard</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">🔐 RitzYard</h1>
           <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">Password Recovery</p>
         </div>
         
@@ -251,60 +264,82 @@ export const forgotSupplierPassword = async (req: Request, res: Response) => {
           <h2 style="color: #333; margin-top: 0;">Reset Your Password</h2>
           
           <p style="color: #666; line-height: 1.6;">
-            We received a request to reset your password. Use the code below to proceed with resetting your password. This code will expire in 10 minutes.
+            We received a request to reset your password. Use the code below to proceed with resetting your password.
           </p>
           
-          <div style="background: white; padding: 30px; text-align: center; border-radius: 8px; margin: 30px 0;">
-            <p style="color: #999; margin: 0 0 10px 0; font-size: 14px;">Your Reset Code</p>
-            <h3 style="color: #667eea; font-size: 32px; letter-spacing: 3px; margin: 10px 0; font-weight: bold;">${resetCode}</h3>
-            <p style="color: #999; margin: 10px 0 0 0; font-size: 12px;">Valid for 10 minutes</p>
+          <p style="color: #e74c3c; font-weight: bold; font-size: 14px;">
+            ⏱️ This code will expire in 15 minutes
+          </p>
+          
+          <div style="background: white; padding: 30px; text-align: center; border-radius: 8px; margin: 30px 0; border: 2px solid #667eea;">
+            <p style="color: #999; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Reset Code</p>
+            <h3 style="color: #667eea; font-size: 48px; letter-spacing: 8px; margin: 15px 0; font-weight: bold; font-family: 'Courier New', monospace;">${resetCode}</h3>
+            <p style="color: #999; margin: 10px 0 0 0; font-size: 12px;">Copy this code and paste it in the password reset form</p>
           </div>
           
-          <p style="color: #666; line-height: 1.6;">
-            <strong>How to use this code:</strong>
-          </p>
-          <ol style="color: #666; line-height: 1.8;">
-            <li>Go to the Forgot Password page on your account login</li>
-            <li>Enter your email address</li>
-            <li>Paste the reset code: <strong>${resetCode}</strong></li>
-            <li>Create your new password</li>
-          </ol>
+          <div style="background: #e8f4f8; border-left: 4px solid #3498db; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="color: #2c3e50; margin: 0; font-size: 14px;">
+              <strong>📋 How to use this code:</strong>
+            </p>
+            <ol style="color: #2c3e50; line-height: 1.8; margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Go to the RitzYard Supplier login page</li>
+              <li>Click on "Forgot your password?"</li>
+              <li>Enter your email: <strong>${email}</strong></li>
+              <li>Paste the code: <strong style="font-family: 'Courier New', monospace;">${resetCode}</strong></li>
+              <li>Create your new password</li>
+              <li>Login with your new password</li>
+            </ol>
+          </div>
           
-          <p style="color: #666; line-height: 1.6;">
-            If you didn't request a password reset, you can safely ignore this email. Your account security is important to us.
-          </p>
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="color: #856404; margin: 0; font-size: 13px;">
+              <strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email. Your account is secure.
+            </p>
+          </div>
           
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
           
           <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
-            © 2024 RitzYard. All rights reserved.
+            © 2024 RitzYard. All rights reserved. | <a href="https://ritzyard.com" style="color: #667eea; text-decoration: none;">Visit Website</a>
           </p>
         </div>
       </div>
     `;
     
     // Send the email
-    const emailSent = await sendEmail(email, emailSubject, emailHtml);
-    
-    if (!emailSent) {
-      console.warn(`⚠️ Failed to send email to ${email}, but code was generated`);
-      // Still return success but with a note
+    try {
+      const emailSent = await sendEmail(email, emailSubject, emailHtml);
+      
+      if (emailSent) {
+        console.log(`📧 Password reset email sent successfully to ${email}`);
+        return res.json({
+          success: true,
+          message: 'Password reset code sent to your email. Please check your email for the code.',
+          testCode: resetCode // For development/testing only - remove in production
+        });
+      } else {
+        console.warn(`⚠️ Email delivery failed for ${email}, but code was generated`);
+        // Email failed, but code is stored
+        return res.json({
+          success: true,
+          message: 'Password reset code was generated. If email failed, use this code: ' + resetCode,
+          testCode: resetCode // For testing
+        });
+      }
+    } catch (emailError: any) {
+      console.error(`❌ Email error for ${email}:`, emailError.message);
+      // Even if email fails, the code is stored in DB
       return res.json({
         success: true,
-        message: 'Password reset code generated. Use code: ' + resetCode, // For testing
-        code: resetCode // For testing only
+        message: 'Reset code generated. Email service may be temporarily unavailable. Please try again or use the test code.',
+        testCode: resetCode // For testing only
       });
     }
-    
-    res.json({
-      success: true,
-      message: 'Password reset code sent to your email',
-      code: resetCode // Remove in production
-    });
   } catch (error: any) {
+    console.error('❌ Forgot password error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to process password reset request'
     });
   }
 };
@@ -312,6 +347,8 @@ export const forgotSupplierPassword = async (req: Request, res: Response) => {
 export const verifyResetToken = async (req: Request, res: Response) => {
   try {
     const { email, token } = req.body;
+    
+    console.log(`🔍 Verifying reset token for email: ${email}`);
     
     if (!email || !token) {
       return res.status(400).json({
@@ -323,6 +360,7 @@ export const verifyResetToken = async (req: Request, res: Response) => {
     const supplier = await Supplier.findOne({ email });
     
     if (!supplier) {
+      console.warn(`❌ Supplier not found: ${email}`);
       return res.status(404).json({
         success: false,
         message: 'Supplier not found'
@@ -331,13 +369,18 @@ export const verifyResetToken = async (req: Request, res: Response) => {
     
     // Check if reset code exists and is not expired
     if (!(supplier as any).resetPasswordCode || !(supplier as any).resetPasswordExpiry) {
+      console.warn(`⚠️ No reset code found for ${email}`);
       return res.status(400).json({
         success: false,
         message: 'No reset code found. Please request a new one'
       });
     }
     
-    if (Date.now() > (supplier as any).resetPasswordExpiry) {
+    const now = Date.now();
+    const expiry = (supplier as any).resetPasswordExpiry;
+    
+    if (now > expiry) {
+      console.log(`⚠️ Reset code expired for ${email}`);
       (supplier as any).resetPasswordCode = undefined;
       (supplier as any).resetPasswordExpiry = undefined;
       await supplier.save();
@@ -347,21 +390,24 @@ export const verifyResetToken = async (req: Request, res: Response) => {
       });
     }
     
-    if ((supplier as any).resetPasswordCode !== token) {
+    if ((supplier as any).resetPasswordCode !== token.toString()) {
+      console.warn(`❌ Invalid reset code for ${email}. Expected: ${(supplier as any).resetPasswordCode}, Got: ${token}`);
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification code'
+        message: 'Invalid verification code. Please check and try again'
       });
     }
     
+    console.log(`✅ Reset token verified successfully for ${email}`);
     res.json({
       success: true,
-      message: 'Verification code is valid'
+      message: 'Verification code is valid. You can now reset your password'
     });
   } catch (error: any) {
+    console.error('❌ Verify reset token error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Error verifying reset code'
     });
   }
 };
@@ -369,6 +415,8 @@ export const verifyResetToken = async (req: Request, res: Response) => {
 export const resetSupplierPassword = async (req: Request, res: Response) => {
   try {
     const { email, token, newPassword } = req.body;
+    
+    console.log(`🔑 Resetting password for email: ${email}`);
     
     if (!email || !token || !newPassword) {
       return res.status(400).json({
@@ -387,6 +435,7 @@ export const resetSupplierPassword = async (req: Request, res: Response) => {
     const supplier = await Supplier.findOne({ email });
     
     if (!supplier) {
+      console.warn(`❌ Supplier not found for password reset: ${email}`);
       return res.status(404).json({
         success: false,
         message: 'Supplier not found'
@@ -394,14 +443,16 @@ export const resetSupplierPassword = async (req: Request, res: Response) => {
     }
     
     // Verify reset code
-    if ((supplier as any).resetPasswordCode !== token) {
+    if ((supplier as any).resetPasswordCode !== token.toString()) {
+      console.warn(`❌ Invalid reset token for ${email}`);
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification code'
+        message: 'Invalid verification code. Please request a new reset code'
       });
     }
     
     if (!(supplier as any).resetPasswordExpiry || Date.now() > (supplier as any).resetPasswordExpiry) {
+      console.warn(`❌ Reset token expired for ${email}`);
       (supplier as any).resetPasswordCode = undefined;
       (supplier as any).resetPasswordExpiry = undefined;
       await supplier.save();
@@ -412,20 +463,31 @@ export const resetSupplierPassword = async (req: Request, res: Response) => {
     }
     
     // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    supplier.password = await bcrypt.hash(newPassword, salt);
-    (supplier as any).resetPasswordCode = undefined;
-    (supplier as any).resetPasswordExpiry = undefined;
-    await supplier.save();
-    
-    res.json({
-      success: true,
-      message: 'Password reset successfully'
-    });
+    try {
+      const salt = await bcrypt.genSalt(10);
+      supplier.password = await bcrypt.hash(newPassword, salt);
+      (supplier as any).resetPasswordCode = undefined;
+      (supplier as any).resetPasswordExpiry = undefined;
+      await supplier.save();
+      
+      console.log(`✅ Password reset successfully for ${email}`);
+      
+      res.json({
+        success: true,
+        message: 'Password reset successfully! You can now login with your new password'
+      });
+    } catch (hashError: any) {
+      console.error(`❌ Password hashing failed: ${hashError.message}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Error resetting password. Please try again'
+      });
+    }
   } catch (error: any) {
+    console.error('❌ Reset password error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Error resetting password'
     });
   }
-}
+};
