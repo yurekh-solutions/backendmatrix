@@ -4,6 +4,7 @@ import Supplier from '../models/Supplier';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import crypto from 'crypto';
+import { sendEmail } from '../config/email';
 
 export const adminLogin = async (req: Request, res: Response) => {
   try {
@@ -237,18 +238,68 @@ export const forgotSupplierPassword = async (req: Request, res: Response) => {
     (supplier as any).resetPasswordExpiry = resetCodeExpiry;
     await supplier.save();
     
-    // In production, send email here
-    // For now, we'll log it
-    console.log(`🔐 Password reset code for ${email}: ${resetCode}`);
+    // Send email with reset code
+    const emailSubject = 'Password Reset Code - RitzYard';
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">RitzYard</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">Password Recovery</p>
+        </div>
+        
+        <div style="padding: 40px; background: #f9f9f9; border-radius: 0 0 8px 8px;">
+          <h2 style="color: #333; margin-top: 0;">Reset Your Password</h2>
+          
+          <p style="color: #666; line-height: 1.6;">
+            We received a request to reset your password. Use the code below to proceed with resetting your password. This code will expire in 10 minutes.
+          </p>
+          
+          <div style="background: white; padding: 30px; text-align: center; border-radius: 8px; margin: 30px 0;">
+            <p style="color: #999; margin: 0 0 10px 0; font-size: 14px;">Your Reset Code</p>
+            <h3 style="color: #667eea; font-size: 32px; letter-spacing: 3px; margin: 10px 0; font-weight: bold;">${resetCode}</h3>
+            <p style="color: #999; margin: 10px 0 0 0; font-size: 12px;">Valid for 10 minutes</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6;">
+            <strong>How to use this code:</strong>
+          </p>
+          <ol style="color: #666; line-height: 1.8;">
+            <li>Go to the Forgot Password page on your account login</li>
+            <li>Enter your email address</li>
+            <li>Paste the reset code: <strong>${resetCode}</strong></li>
+            <li>Create your new password</li>
+          </ol>
+          
+          <p style="color: #666; line-height: 1.6;">
+            If you didn't request a password reset, you can safely ignore this email. Your account security is important to us.
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+          
+          <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
+            © 2024 RitzYard. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
     
-    // Simulate sending email (in production, use nodemailer or similar)
-    // await sendPasswordResetEmail(email, resetCode);
+    // Send the email
+    const emailSent = await sendEmail(email, emailSubject, emailHtml);
+    
+    if (!emailSent) {
+      console.warn(`⚠️ Failed to send email to ${email}, but code was generated`);
+      // Still return success but with a note
+      return res.json({
+        success: true,
+        message: 'Password reset code generated. Use code: ' + resetCode, // For testing
+        code: resetCode // For testing only
+      });
+    }
     
     res.json({
       success: true,
-      message: 'Password reset code sent to your email. Use code: ' + resetCode, // Remove in production
-      // In production, don't return the code
-      code: resetCode // For testing only
+      message: 'Password reset code sent to your email',
+      code: resetCode // Remove in production
     });
   } catch (error: any) {
     res.status(500).json({
