@@ -37,9 +37,11 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'https://supplierportal-mu.vercel.app',      // Supplier Portal - Production
   'https://admin-panel-ritzyard.vercel.app',   // Admin Panel - Production
+  'https://yurekhmatrix.vercel.app',           // Customer Portal - Production
+  'https://ritzyard.com',                      // Custom domain (if any)
   'http://localhost:5173',                      // Vite dev - Supplier Portal
   'http://localhost:3002',                      // Vite dev - Admin Panel
-  'http://localhost:8080',                      // Vite dev - Alternative
+  'http://localhost:8080',                      // Vite dev - yurekhmatrix
   'http://127.0.0.1:5173',                      // localhost variations
   'http://127.0.0.1:3002',
   'http://127.0.0.1:8080',
