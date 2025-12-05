@@ -28,7 +28,6 @@ import adminAutomationRoutes from './routes/adminAutomation';
 import miloGuideRoutes from './routes/miloGuide';
 import materialInquiryRoutes from './routes/materialInquiry';
 import whatsappWebhookRoutes from './routes/whatsappWebhook';
-import productInquiryRoutes from './routes/productInquiryRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
@@ -38,15 +37,15 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'https://supplierportal-mu.vercel.app',      // Supplier Portal - Production
   'https://admin-panel-ritzyard.vercel.app',   // Admin Panel - Production
-  'https://yurekhmatrix.vercel.app',           // Customer Portal - Production
-  'https://ritzyard.com',                      // Custom domain (if any)
-  'http://localhost:5173',                      // Vite dev - Supplier Portal
-  'http://localhost:3002',                      // Vite dev - Admin Panel
-  'http://localhost:8080',                      // Vite dev - yurekhmatrix
-  'http://127.0.0.1:5173',                      // localhost variations
-  'http://127.0.0.1:3002',
-  'http://127.0.0.1:8080',
+  'https://ritzyard.com',                       // Main domain
 ];
+
+// Add all localhost/127.0.0.1 variations for development (ports 3000-9000)
+const devPorts = [3000, 3002, 3003, 5173, 5174, 5175, 8000, 8001, 8080, 8081, 8082, 8083, 9000];
+devPorts.forEach(port => {
+  allowedOrigins.push(`http://localhost:${port}`);
+  allowedOrigins.push(`http://127.0.0.1:${port}`);
+});
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -114,7 +113,6 @@ app.use('/api/automation', automationRoutes);
 app.use('/api/milo/guide', miloGuideRoutes);
 app.use('/api/material-inquiries', materialInquiryRoutes);
 app.use('/api/whatsapp', whatsappWebhookRoutes);
-app.use('/api/product-inquiries', productInquiryRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
