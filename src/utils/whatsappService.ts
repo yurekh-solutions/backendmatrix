@@ -15,6 +15,26 @@ interface RFQData {
   }>;
 }
 
+interface MaterialInquiryData {
+  inquiryNumber: string;
+  customerName: string;
+  companyName?: string;
+  email: string;
+  phone: string;
+  materials: Array<{
+    materialName: string;
+    category: string;
+    grade?: string;
+    specification?: string;
+    quantity: number;
+    unit: string;
+    targetPrice?: number;
+  }>;
+  deliveryLocation: string;
+  totalEstimatedValue?: number;
+  additionalRequirements?: string;
+}
+
 /**
  * Sends RFQ notification via WhatsApp
  * Using WhatsApp Web URL (client-side approach)
@@ -128,5 +148,87 @@ export const notifyRFQViaWhatsApp = async (
   } catch (error) {
     console.error('❌ Error notifying RFQ via WhatsApp:', error);
     throw error;
+  }
+};
+
+/**
+ * Formats Material Inquiry message for WhatsApp
+ */
+export const sendMaterialInquiryToWhatsApp = (data: MaterialInquiryData): string => {
+  // Format WhatsApp message with emoji
+  let message = '📦 *MATERIAL INQUIRY REQUEST*\n\n';
+  
+  message += '*Customer Details:*\n';
+  message += `👤 Name: ${data.customerName}\n`;
+  if (data.companyName) {
+    message += `🏢 Company: ${data.companyName}\n`;
+  }
+  message += `📧 Email: ${data.email}\n`;
+  message += `📱 Phone: ${data.phone}\n`;
+  message += `📍 Location: ${data.deliveryLocation}\n\n`;
+  
+  message += '*Material Requirements:*\n';
+  
+  data.materials.forEach((material, index) => {
+    message += `\n📌 *Material ${index + 1}*\n`;
+    message += `• Material: ${material.materialName}\n`;
+    message += `• Category: ${material.category}\n`;
+    if (material.grade) {
+      message += `• Grade: ${material.grade}\n`;
+    }
+    message += `• Quantity: ${material.quantity} ${material.unit}\n`;
+    if (material.targetPrice) {
+      message += `• Target Price: ₹${material.targetPrice.toLocaleString()}\n`;
+    }
+  });
+  
+  if (data.additionalRequirements) {
+    message += `\n*Additional Requirements:*\n${data.additionalRequirements}\n`;
+  }
+  
+  if (data.totalEstimatedValue) {
+    message += `\n💰 *Total Estimated Value:* ₹${data.totalEstimatedValue.toLocaleString()}\n`;
+  }
+  
+  message += `\n📋 *Inquiry #:* ${data.inquiryNumber}\n`;
+  message += `🕐 *Time:* ${new Date().toLocaleString()}\n\n`;
+  message += '_Please provide quotation at your earliest convenience._';
+  
+  return message;
+};
+
+/**
+ * Sends Material Inquiry notification via WhatsApp
+ */
+export const notifyMaterialInquiryViaWhatsApp = async (
+  inquiryData: MaterialInquiryData,
+  recipientPhoneNumber: string = '919136242706'
+): Promise<{ success: boolean; whatsappUrl: string }> => {
+  try {
+    const message = sendMaterialInquiryToWhatsApp(inquiryData);
+
+    console.log('📱 Preparing Material Inquiry WhatsApp notification...');
+    console.log('Message preview:', message.substring(0, 100) + '...');
+
+    // Try to send via API (Twilio)
+    await sendWhatsAppViaAPI(recipientPhoneNumber, message);
+
+    // Also generate web URL as fallback
+    const whatsappUrl = generateWhatsAppWebURL(recipientPhoneNumber, message);
+
+    console.log('✅ Material Inquiry notification prepared for WhatsApp');
+    console.log('📲 WhatsApp URL:', whatsappUrl);
+
+    return {
+      success: true,
+      whatsappUrl,
+    };
+  } catch (error) {
+    console.error('❌ Error notifying Material Inquiry via WhatsApp:', error);
+    // Don't throw - inquiry should still be saved
+    return {
+      success: false,
+      whatsappUrl: '',
+    };
   }
 };

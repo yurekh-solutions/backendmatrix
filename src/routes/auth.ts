@@ -1,13 +1,12 @@
 import express from 'express';
-import { adminLogin, supplierLogin, setupSupplierPassword, forgotSupplierPassword, verifyResetToken, resetSupplierPassword } from '../controllers/authController';
+import { adminLogin, supplierLogin, setupSupplierPassword, requestPasswordReset, resetPassword } from '../controllers/authController';
 
 const router = express.Router();
 
 router.post('/admin/login', adminLogin);
 router.post('/supplier/login', supplierLogin);
 router.post('/supplier/setup-password', setupSupplierPassword);
-router.post('/supplier/forgot-password', forgotSupplierPassword);
-router.post('/supplier/verify-reset-token', verifyResetToken);
-router.post('/supplier/reset-password', resetSupplierPassword);
+router.post('/supplier/forgot-password', requestPasswordReset);
+router.post('/supplier/reset-password', resetPassword);
 
 export default router;
