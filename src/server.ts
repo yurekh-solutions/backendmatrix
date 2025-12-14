@@ -37,7 +37,9 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'https://supplierportal-mu.vercel.app',      // Supplier Portal - Production
   'https://admin-panel-ritzyard.vercel.app',   // Admin Panel - Production
+  'https://yurekhmatrix.vercel.app',           // yurekhmatrix - Production (ADDED)
   'https://ritzyard.com',                       // Main domain
+  'https://www.ritzyard.com',                   // Main domain with www
 ];
 
 // Add all localhost/127.0.0.1 variations for development (ports 3000-9000)
