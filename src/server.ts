@@ -37,7 +37,7 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'https://supplierportal-mu.vercel.app',      // Supplier Portal - Production
   'https://admin-panel-ritzyard.vercel.app',   // Admin Panel - Production
-  'https://yurekhmatrix.vercel.app',           // yurekhmatrix - Production (ADDED)
+  'https://yurekhmatrix.vercel.app',           // yurekhmatrix - Production
   'https://ritzyard.com',                       // Main domain
   'https://www.ritzyard.com',                   // Main domain with www
 ];
@@ -54,12 +54,28 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, curl requests, etc)
     if (!origin) return callback(null, true);
     
+    // Check for exact match
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
-    } else {
-      console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      return;
     }
+    
+    // Allow all vercel.app deployments by domain pattern
+    if (origin.endsWith('.vercel.app')) {
+      console.log(`✅ CORS allowed Vercel deployment: ${origin}`);
+      callback(null, true);
+      return;
+    }
+    
+    // Allow ritzyard.com and variations
+    if (origin.includes('ritzyard.com')) {
+      console.log(`✅ CORS allowed RitzYard domain: ${origin}`);
+      callback(null, true);
+      return;
+    }
+    
+    console.warn(`⚠️  CORS blocked request from origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

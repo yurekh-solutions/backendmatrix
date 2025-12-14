@@ -10,7 +10,10 @@ export const adminLogin = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     
+    console.log('🔐 Admin login attempt for email:', email);
+    
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return res.status(400).json({
         success: false,
         message: 'Please provide email and password'
@@ -20,15 +23,18 @@ export const adminLogin = async (req: Request, res: Response) => {
     const admin = await Admin.findOne({ email }).select('+password');
     
     if (!admin) {
+      console.log('❌ Admin not found for email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
     
+    console.log('🔍 Admin found, verifying password...');
     const isPasswordMatch = await admin.comparePassword(password);
     
     if (!isPasswordMatch) {
+      console.log('❌ Password mismatch for admin:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -36,12 +42,14 @@ export const adminLogin = async (req: Request, res: Response) => {
     }
     
     if (!admin.isActive) {
+      console.log('❌ Account inactive for admin:', email);
       return res.status(403).json({
         success: false,
         message: 'Your account has been deactivated'
       });
     }
     
+    console.log('✅ Admin authenticated successfully:', email);
     const token = generateToken(String(admin._id), 'admin');
     
     res.json({
@@ -55,6 +63,7 @@ export const adminLogin = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
+    console.error('❌ Error in admin login:', error.message);
     res.status(500).json({
       success: false,
       message: error.message
@@ -187,19 +196,33 @@ export const setupSupplierPassword = async (req: Request, res: Response) => {
 
 export const createDefaultAdmin = async () => {
   try {
-    const adminExists = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@matrixyuvraj.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
     
-    if (!adminExists) {
-      await Admin.create({
-        name: 'System Admin',
-        email: process.env.ADMIN_EMAIL || 'admin@matrixyuvraj.com',
-        password: process.env.ADMIN_PASSWORD || 'Admin@123',
-        role: 'super_admin'
-      });
-      console.log('✅ Default admin account created');
+    console.log('🔍 Checking for default admin account:', adminEmail);
+    const adminExists = await Admin.findOne({ email: adminEmail });
+    
+    if (adminExists) {
+      console.log('✅ Default admin account already exists:', adminEmail);
+      return;
     }
-  } catch (error) {
-    console.error('Error creating default admin:', error);
+    
+    console.log('📝 Creating default admin account...');
+    const newAdmin = await Admin.create({
+      name: 'System Admin',
+      email: adminEmail,
+      password: adminPassword,
+      role: 'super_admin'
+    });
+    console.log('✅ Default admin account created successfully');
+    console.log('   Email:', adminEmail);
+    console.log('   Role: super_admin');
+    console.log('   ID:', newAdmin._id);
+  } catch (error: any) {
+    console.error('❌ Error creating default admin:', error.message);
+    if (error.code === 11000) {
+      console.log('⚠️  Admin account already exists in database');
+    }
   }
 };
 
