@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import Admin from '../models/Admin';
 import Supplier from '../models/Supplier';
+import User from '../models/User';
 
 interface AuthRequest extends Request {
   user?: any;
@@ -88,3 +89,57 @@ export const authenticateSupplier = async (req: AuthRequest, res: Response, next
 // Export aliases
 export const adminAuth = authenticateAdmin;
 export const supplierAuth = authenticateSupplier;
+
+// Generic protect middleware for buyers/users
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+
+    // Support buyer/user tokens
+    if (decoded.type === 'buyer') {
+      const user = await User.findById(decoded.id).select('-password');
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'User not found' });
+      }
+      req.user = user;
+      return next();
+    }
+
+    // Support supplier tokens
+    if (decoded.type === 'supplier') {
+      const supplier = await Supplier.findById(decoded.id).select('-password');
+      if (!supplier || !supplier.isActive) {
+        return res.status(401).json({ success: false, message: 'Supplier not found or inactive' });
+      }
+      req.supplier = supplier;
+      req.user = supplier;
+      return next();
+    }
+
+    // Support admin tokens
+    if (decoded.type === 'admin') {
+      const admin = await Admin.findById(decoded.id).select('-password');
+      if (!admin || !admin.isActive) {
+        return res.status(401).json({ success: false, message: 'Admin not found or inactive' });
+      }
+      req.admin = admin;
+      req.user = admin;
+      return next();
+    }
+
+    return res.status(401).json({ success: false, message: 'Invalid token type' });
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(401).json({ success: false, message: 'Authentication failed' });
+  }
+};

@@ -64,5 +64,26 @@ if (isCloudinaryConfigured) {
   console.warn('⚠️  Cloudinary not configured. Using local storage for uploads.');
 }
 
+// Helper function to upload file to Cloudinary
+export const uploadToCloudinary = async (filePath: string, folder: string = 'uploads'): Promise<string> => {
+  if (!isCloudinaryConfigured) {
+    // Return local file path if Cloudinary not configured
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const relativePath = filePath.replace(uploadDir, '').replace(/\\/g, '/');
+    return `${apiUrl}/uploads${relativePath}`;
+  }
+
+  try {
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder,
+      resource_type: 'auto',
+    });
+    return result.secure_url;
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    throw new Error('Failed to upload file to Cloudinary');
+  }
+};
+
 export { cloudinaryStorage };
 export default cloudinary;

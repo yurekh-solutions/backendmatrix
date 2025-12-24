@@ -6,7 +6,7 @@ const OLD_JWT_SECRETS = [
   'matrixyuvraj_secret_key_2025_supplier_onboarding_system'
 ];
 
-export const generateToken = (id: string, type: 'admin' | 'supplier'): string => {
+export const generateToken = (id: string, type: 'admin' | 'supplier' | 'buyer'): string => {
   const options: SignOptions = {
     expiresIn: '7d'
   };
