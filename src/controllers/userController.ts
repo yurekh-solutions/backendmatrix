@@ -71,6 +71,46 @@ export const updateUserProfile = async (req: Request, res: Response) => {
   }
 };
 
+// Upload profile picture (dedicated endpoint)
+export const uploadProfilePicture = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'No image provided' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Upload profile image to Cloudinary
+    const imageUrl = await uploadToCloudinary(file.path, 'user-profiles');
+    user.profileImage = imageUrl;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile picture uploaded successfully',
+      profilePicture: user.profileImage,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        profileImage: user.profileImage,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Upload profile picture error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Get user cart
 export const getUserCart = async (req: Request, res: Response) => {
   try {
