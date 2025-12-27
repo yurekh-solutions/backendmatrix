@@ -41,6 +41,8 @@ const allowedOrigins = [
   'https://yurekhmatrix.vercel.app',           // yurekhmatrix - Production
   'https://ritzyard.com',                       // Main domain
   'https://www.ritzyard.com',                   // Main domain with www
+  'https://ritzyardseller.com',                 // Supplier Portal - Custom Domain
+  'https://www.ritzyardseller.com',             // Supplier Portal - Custom Domain with www
 ];
 
 // Add all localhost/127.0.0.1 variations for development (ports 3000-9000)
