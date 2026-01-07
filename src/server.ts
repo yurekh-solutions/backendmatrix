@@ -85,8 +85,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-API-Key'],
   exposedHeaders: ['Content-Disposition', 'Content-Type']
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve uploaded files statically with proper MIME types
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {

@@ -304,9 +304,17 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
       supplier.passwordResetTokenExpiry = undefined;
       await supplier.save();
       
+      console.error('❌ SMTP Configuration Issue:');
+      console.error('Please configure SMTP settings in .env file:');
+      console.error('SMTP_HOST=smtp.gmail.com');
+      console.error('SMTP_PORT=587');
+      console.error('SMTP_USER=your-email@gmail.com');
+      console.error('SMTP_PASS=your-app-password');
+      console.error('Get app password from: https://myaccount.google.com/apppasswords');
+      
       return res.status(500).json({
         success: false,
-        message: 'Failed to send reset email. Please try again.'
+        message: 'Email service is not configured. Please contact administrator.'
       });
     }
   } catch (error: any) {

@@ -1,13 +1,16 @@
-import { Request, Response } from 'express';
+ import { Request, Response } from 'express';
 import Supplier from '../models/Supplier';
 import Lead from '../models/Lead';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 
 export const submitOnboarding = async (req: Request, res: Response) => {
   try {
     console.log('📥 Received onboarding submission');
+    console.log('📋 Request headers:', req.headers);
     console.log('📋 Request body:', req.body);
     console.log('📎 Files received:', Object.keys(req.files || {}));
+    console.log('📏 Content-Length:', req.headers['content-length']);
     
     const {
       companyName,
@@ -15,6 +18,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
       phone,
       contactPerson,
       businessType,
+      password,
       address,
       businessDescription,
       productsOffered,
@@ -29,6 +33,25 @@ export const submitOnboarding = async (req: Request, res: Response) => {
         message: 'Missing required fields: companyName, email, phone, contactPerson'
       });
     }
+
+    // Validate password
+    if (!password) {
+      console.error('❌ Password is required');
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
     
     // Check if supplier already exists
     const existingSupplier = await Supplier.findOne({ email });
@@ -45,15 +68,6 @@ export const submitOnboarding = async (req: Request, res: Response) => {
     const documents: any = {};
     
     if (files) {
-      // Company Logo - Optional
-      if (files.logo && files.logo[0]) {
-        documents.logo = {
-          fileUrl: `/uploads/${files.logo[0].filename}`,
-          fileName: files.logo[0].originalname,
-          uploadedAt: new Date()
-        };
-      }
-      
       // PAN is required
       if (files.pan && files.pan[0]) {
         documents.pan = {
@@ -124,6 +138,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
           phone,
           contactPerson,
           businessType,
+          password: hashedPassword,
           address: JSON.parse(address),
           documents,
           businessDescription,
@@ -145,6 +160,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
         phone,
         contactPerson,
         businessType,
+        password: hashedPassword,
         address: JSON.parse(address),
         documents,
         businessDescription,
