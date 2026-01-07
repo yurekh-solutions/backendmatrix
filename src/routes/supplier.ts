@@ -9,6 +9,7 @@ const router = express.Router();
 router.post(
   '/submit',
   upload.fields([
+    { name: 'logo', maxCount: 1 },
     { name: 'gst', maxCount: 1 },
     { name: 'cin', maxCount: 1 },
     { name: 'pan', maxCount: 1 },

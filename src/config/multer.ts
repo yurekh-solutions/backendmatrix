@@ -67,6 +67,15 @@ const documentFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilt
   }
 };
 
+// Multer instance for images (uses Cloudinary) - For profile pictures, product images, etc.
+export const uploadImages = multer({
+  storage: cloudinaryStorage,
+  fileFilter: imageFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
+
 // Multer instance for product images (uses Cloudinary)
 export const uploadProductImage = multer({
   storage: cloudinaryStorage,

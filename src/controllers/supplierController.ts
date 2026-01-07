@@ -45,6 +45,15 @@ export const submitOnboarding = async (req: Request, res: Response) => {
     const documents: any = {};
     
     if (files) {
+      // Company Logo - Optional
+      if (files.logo && files.logo[0]) {
+        documents.logo = {
+          fileUrl: `/uploads/${files.logo[0].filename}`,
+          fileName: files.logo[0].originalname,
+          uploadedAt: new Date()
+        };
+      }
+      
       // PAN is required
       if (files.pan && files.pan[0]) {
         documents.pan = {
