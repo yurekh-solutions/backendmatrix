@@ -7,6 +7,7 @@ export interface ISupplier extends Document {
   phone: string;
   contactPerson: string;
   businessType: 'business' | 'individual';
+  logo?: string; // Company logo URL (stored in Cloudinary)
   
   // Address
   address: {
@@ -109,6 +110,9 @@ const supplierSchema = new Schema<ISupplier>({
     type: String,
     enum: ['business', 'individual'],
     required: true
+  },
+  logo: {
+    type: String
   },
   address: {
     street: { type: String, required: true },

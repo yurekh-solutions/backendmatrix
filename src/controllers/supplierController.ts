@@ -3,6 +3,7 @@ import Supplier from '../models/Supplier';
 import Lead from '../models/Lead';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import cloudinary from '../config/cloudinary';
 
 export const submitOnboarding = async (req: Request, res: Response) => {
   try {
@@ -66,8 +67,27 @@ export const submitOnboarding = async (req: Request, res: Response) => {
     // Process uploaded files
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
     const documents: any = {};
+    let logoUrl: string | undefined = undefined;
     
     if (files) {
+      // Handle logo upload to Cloudinary (optional)
+      if (files.logo && files.logo[0]) {
+        try {
+          console.log('📸 Uploading logo to Cloudinary...');
+          const result = await cloudinary.uploader.upload(files.logo[0].path, {
+            folder: 'supplier-logos',
+            transformation: [
+              { width: 200, height: 200, crop: 'fill', gravity: 'center' },
+              { quality: 'auto' }
+            ]
+          });
+          logoUrl = result.secure_url;
+          console.log('✅ Logo uploaded successfully:', logoUrl);
+        } catch (err) {
+          console.error('❌ Error uploading logo:', err);
+          // Logo upload is optional, continue even if it fails
+        }
+      }
       // PAN is required
       if (files.pan && files.pan[0]) {
         documents.pan = {
@@ -144,6 +164,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
           businessDescription,
           productsOffered: JSON.parse(productsOffered),
           yearsInBusiness: Number(yearsInBusiness),
+          ...(logoUrl && { logo: logoUrl }), // Only update logo if provided
           status: 'pending',
           rejectionReason: undefined,
           submittedAt: new Date(),
@@ -166,6 +187,7 @@ export const submitOnboarding = async (req: Request, res: Response) => {
         businessDescription,
         productsOffered: JSON.parse(productsOffered),
         yearsInBusiness: Number(yearsInBusiness),
+        ...(logoUrl && { logo: logoUrl }), // Only include logo if provided
         status: 'pending'
       });
     }
