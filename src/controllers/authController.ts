@@ -126,7 +126,8 @@ export const supplierLogin = async (req: Request, res: Response) => {
         id: supplier._id,
         companyName: supplier.companyName,
         email: supplier.email,
-        status: supplier.status
+        status: supplier.status,
+        logo: supplier.logo
       }
     });
   } catch (error: any) {
@@ -184,7 +185,8 @@ export const setupSupplierPassword = async (req: Request, res: Response) => {
       user: {
         id: supplier._id,
         companyName: supplier.companyName,
-        email: supplier.email
+        email: supplier.email,
+        logo: supplier.logo
       }
     });
   } catch (error: any) {
