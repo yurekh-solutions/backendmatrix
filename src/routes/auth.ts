@@ -1,6 +1,8 @@
 import express from 'express';
 import { adminLogin, supplierLogin, setupSupplierPassword, requestPasswordReset, resetPassword, userSignup, userLogin } from '../controllers/authController';
 
+import { uploadImages } from '../config/multer';
+
 const router = express.Router();
 
 router.post('/admin/login', adminLogin);
@@ -10,7 +12,7 @@ router.post('/supplier/forgot-password', requestPasswordReset);
 router.post('/supplier/reset-password', resetPassword);
 
 // User (Buyer) Auth Routes
-router.post('/user/signup', userSignup);
+router.post('/user/signup', uploadImages.fields([{ name: 'profileImage', maxCount: 1 }, { name: 'businessImage', maxCount: 1 }]), userSignup);
 router.post('/user/login', userLogin);
 
 export default router;
