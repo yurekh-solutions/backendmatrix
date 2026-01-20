@@ -5,7 +5,9 @@ export interface IUser extends Document {
   email: string;
   password: string;
   phone?: string;
+  company?: string;
   profileImage?: string;
+  businessImage?: string;
   role: 'buyer' | 'guest';
   cart: {
     productId: mongoose.Types.ObjectId;
@@ -39,7 +41,14 @@ const UserSchema = new Schema<IUser>(
       type: String,
       trim: true,
     },
+    company: {
+      type: String,
+      trim: true,
+    },
     profileImage: {
+      type: String, // Cloudinary URL
+    },
+    businessImage: {
       type: String, // Cloudinary URL
     },
     role: {

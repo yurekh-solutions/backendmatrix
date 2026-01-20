@@ -16,8 +16,8 @@ const router = express.Router();
 
 // Profile routes
 router.get('/profile', protect, getUserProfile);
-router.put('/profile', protect, upload.single('profileImage'), updateUserProfile);
-router.post('/profile-picture', protect, upload.single('profilePicture'), uploadProfilePicture);
+router.put('/profile', protect, upload.any(), updateUserProfile);
+router.post('/profile-picture', protect, upload.any(), uploadProfilePicture);
 
 // Cart routes
 router.get('/cart', protect, getUserCart);

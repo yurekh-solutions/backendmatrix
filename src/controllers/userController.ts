@@ -19,7 +19,9 @@ export const getUserProfile = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        company: user.company,
         profileImage: user.profileImage,
+        businessImage: user.businessImage,
         role: user.role,
       },
     });
@@ -33,7 +35,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
 export const updateUserProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { name, phone } = req.body;
+    const { name, phone, company } = req.body;
     const file = req.file;
 
     const user = await User.findById(userId);
@@ -44,11 +46,21 @@ export const updateUserProfile = async (req: Request, res: Response) => {
     // Update basic fields
     if (name) user.name = name;
     if (phone) user.phone = phone;
+    if (company) user.company = company;
 
-    // Upload profile image to Cloudinary if provided
+    // Handle file upload
     if (file) {
-      const imageUrl = await uploadToCloudinary(file.path, 'user-profiles');
-      user.profileImage = imageUrl;
+      // Determine if it's profileImage or businessImage based on fieldname
+      const fieldname = file.fieldname || 'profileImage';
+      const folder = fieldname === 'businessImage' ? 'user-business' : 'user-profiles';
+      
+      const imageUrl = await uploadToCloudinary(file.path, folder);
+      
+      if (fieldname === 'businessImage') {
+        user.businessImage = imageUrl;
+      } else {
+        user.profileImage = imageUrl;
+      }
     }
 
     await user.save();
@@ -61,7 +73,9 @@ export const updateUserProfile = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        company: user.company,
         profileImage: user.profileImage,
+        businessImage: user.businessImage,
         role: user.role,
       },
     });

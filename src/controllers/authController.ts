@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import { sendEmail } from '../config/email';
 import crypto from 'crypto';
+import { uploadToCloudinary } from '../config/cloudinary';
 
 export const adminLogin = async (req: Request, res: Response) => {
   try {
@@ -422,7 +423,8 @@ export const resetPassword = async (req: Request, res: Response) => {
 // User (Buyer) Signup
 export const userSignup = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, company } = req.body;
+    const file = req.file;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -451,12 +453,34 @@ export const userSignup = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    let profileImage = '';
+    let businessImage = '';
+
+    if (req.files && Array.isArray(req.files)) {
+      const files = req.files as Express.Multer.File[];
+      const profileFile = files.find(f => f.fieldname === 'profileImage');
+      const businessFile = files.find(f => f.fieldname === 'businessImage');
+
+      if (profileFile) {
+        profileImage = await uploadToCloudinary(profileFile.path, 'user-profiles');
+      }
+      if (businessFile) {
+        businessImage = await uploadToCloudinary(businessFile.path, 'user-business');
+      }
+    } else if (req.file) {
+      // Fallback for single file
+      profileImage = await uploadToCloudinary(req.file.path, 'user-profiles');
+    }
+
     // Create new user
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
       phone,
+      company,
+      profileImage,
+      businessImage,
       role: 'buyer',
     });
 
@@ -470,10 +494,14 @@ export const userSignup = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        company: user.company,
+        profileImage: user.profileImage,
+        businessImage: user.businessImage,
         role: user.role,
       },
     });
   } catch (error: any) {
+    console.error('Signup error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -521,7 +549,9 @@ export const userLogin = async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        company: user.company,
         profileImage: user.profileImage,
+        businessImage: user.businessImage,
         role: user.role,
       },
     });
