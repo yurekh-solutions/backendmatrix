@@ -128,7 +128,8 @@ export const supplierLogin = async (req: Request, res: Response) => {
         companyName: supplier.companyName,
         email: supplier.email,
         status: supplier.status,
-        logo: supplier.logo
+        logo: supplier.logo,
+        profileImage: supplier.logo, // For frontend compatibility
       }
     });
   } catch (error: any) {
@@ -456,20 +457,45 @@ export const userSignup = async (req: Request, res: Response) => {
     let profileImage = '';
     let businessImage = '';
 
-    if (req.files && Array.isArray(req.files)) {
-      const files = req.files as Express.Multer.File[];
-      const profileFile = files.find(f => f.fieldname === 'profileImage');
-      const businessFile = files.find(f => f.fieldname === 'businessImage');
+    // When using uploadImages middleware with cloudinaryStorage,
+    // files are already uploaded to Cloudinary and URLs are in file.path
+    if (req.files) {
+      console.log('📸 Processing uploaded files for signup...');
+      
+      if (Array.isArray(req.files)) {
+        const files = req.files as Express.Multer.File[];
+        const profileFile = files.find(f => f.fieldname === 'profileImage');
+        const businessFile = files.find(f => f.fieldname === 'businessImage');
 
-      if (profileFile) {
-        profileImage = await uploadToCloudinary(profileFile.path, 'user-profiles');
-      }
-      if (businessFile) {
-        businessImage = await uploadToCloudinary(businessFile.path, 'user-business');
+        if (profileFile) {
+          // With cloudinaryStorage, URL is already in file.path
+          profileImage = (profileFile as any).path || (profileFile as any).secure_url || '';
+          console.log('✅ Profile image URL:', profileImage);
+        }
+        if (businessFile) {
+          businessImage = (businessFile as any).path || (businessFile as any).secure_url || '';
+          console.log('✅ Business image URL:', businessImage);
+        }
+      } else {
+        // req.files is an object (when using .fields())
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        
+        if (files['profileImage'] && files['profileImage'][0]) {
+          const profileFile = files['profileImage'][0];
+          profileImage = (profileFile as any).path || (profileFile as any).secure_url || '';
+          console.log('✅ Profile image URL:', profileImage);
+        }
+        
+        if (files['businessImage'] && files['businessImage'][0]) {
+          const businessFile = files['businessImage'][0];
+          businessImage = (businessFile as any).path || (businessFile as any).secure_url || '';
+          console.log('✅ Business image URL:', businessImage);
+        }
       }
     } else if (req.file) {
       // Fallback for single file
-      profileImage = await uploadToCloudinary(req.file.path, 'user-profiles');
+      profileImage = (req.file as any).path || (req.file as any).secure_url || '';
+      console.log('✅ Single file profile image URL:', profileImage);
     }
 
     // Create new user

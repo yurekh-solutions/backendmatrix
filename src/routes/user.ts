@@ -10,14 +10,14 @@ import {
   clearCart,
 } from '../controllers/userController';
 import { protect } from '../middleware/auth';
-import { upload } from '../config/multer';
+import { uploadImages } from '../config/multer';
 
 const router = express.Router();
 
-// Profile routes
+// Profile routes - using uploadImages for Cloudinary storage
 router.get('/profile', protect, getUserProfile);
-router.put('/profile', protect, upload.any(), updateUserProfile);
-router.post('/profile-picture', protect, upload.any(), uploadProfilePicture);
+router.put('/profile', protect, uploadImages.any(), updateUserProfile);
+router.post('/profile-picture', protect, uploadImages.any(), uploadProfilePicture);
 
 // Cart routes
 router.get('/cart', protect, getUserCart);
