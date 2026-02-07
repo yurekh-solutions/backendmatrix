@@ -26,12 +26,40 @@ export const submitOnboarding = async (req: Request, res: Response) => {
       yearsInBusiness
     } = req.body;
     
+    // Collect missing fields for detailed error message
+    const missingFields: string[] = [];
+    
     // Validate required fields
-    if (!companyName || !email || !phone || !contactPerson) {
-      console.error('❌ Missing required fields');
+    if (!companyName) missingFields.push('companyName');
+    if (!email) missingFields.push('email');
+    if (!phone) missingFields.push('phone');
+    if (!contactPerson) missingFields.push('contactPerson');
+    if (!password) missingFields.push('password');
+    if (!businessDescription) missingFields.push('businessDescription');
+    if (!productsOffered) missingFields.push('productsOffered');
+    if (!yearsInBusiness) missingFields.push('yearsInBusiness');
+    
+    // Validate address field
+    if (!address) {
+      missingFields.push('address');
+    } else {
+      try {
+        const parsedAddress = JSON.parse(address);
+        if (!parsedAddress.street) missingFields.push('address.street');
+        if (!parsedAddress.city) missingFields.push('address.city');
+        if (!parsedAddress.state) missingFields.push('address.state');
+        if (!parsedAddress.pincode) missingFields.push('address.pincode');
+      } catch (e) {
+        missingFields.push('address (invalid JSON)');
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      console.error('❌ Missing required fields:', missingFields);
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: companyName, email, phone, contactPerson'
+        message: `Missing required fields: ${missingFields.join(', ')}`,
+        missingFields
       });
     }
 
@@ -102,39 +130,21 @@ export const submitOnboarding = async (req: Request, res: Response) => {
         });
       }
       
-      // Optional documents based on business type
-      if (businessType === 'business') {
-        if (files.gst && files.gst[0]) {
-          documents.gst = {
-            fileUrl: `/uploads/${files.gst[0].filename}`,
-            fileName: files.gst[0].originalname,
-            uploadedAt: new Date()
-          };
-        }
-        
-        if (files.cin && files.cin[0]) {
-          documents.cin = {
-            fileUrl: `/uploads/${files.cin[0].filename}`,
-            fileName: files.cin[0].originalname,
-            uploadedAt: new Date()
-          };
-        }
-        
-        if (files.businessLicense && files.businessLicense[0]) {
-          documents.businessLicense = {
-            fileUrl: `/uploads/${files.businessLicense[0].filename}`,
-            fileName: files.businessLicense[0].originalname,
-            uploadedAt: new Date()
-          };
-        }
-      } else if (businessType === 'individual') {
-        if (files.aadhaar && files.aadhaar[0]) {
-          documents.aadhaar = {
-            fileUrl: `/uploads/${files.aadhaar[0].filename}`,
-            fileName: files.aadhaar[0].originalname,
-            uploadedAt: new Date()
-          };
-        }
+      // Optional documents - accept for all business types
+      if (files.gst && files.gst[0]) {
+        documents.gst = {
+          fileUrl: `/uploads/${files.gst[0].filename}`,
+          fileName: files.gst[0].originalname,
+          uploadedAt: new Date()
+        };
+      }
+      
+      if (files.aadhaar && files.aadhaar[0]) {
+        documents.aadhaar = {
+          fileUrl: `/uploads/${files.aadhaar[0].filename}`,
+          fileName: files.aadhaar[0].originalname,
+          uploadedAt: new Date()
+        };
       }
       
       if (files.bankProof && files.bankProof[0]) {
