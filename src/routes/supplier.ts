@@ -1,5 +1,5 @@
 import express from 'express';
-import { submitOnboarding, checkApplicationStatus, getSupplierInquiries } from '../controllers/supplierController';
+import { submitOnboarding, checkApplicationStatus, getSupplierInquiries, updateSupplierProfile } from '../controllers/supplierController';
 import { upload } from '../config/multer';
 import { uploadImages } from '../config/multer'; // For logo (Cloudinary)
 import { supplierAuth } from '../middleware/auth';
@@ -29,5 +29,8 @@ router.get('/check-status', checkApplicationStatus);
 
 // Protected route - get supplier's inquiries
 router.get('/inquiries', supplierAuth, getSupplierInquiries);
+
+// Protected route - update supplier profile
+router.put('/profile', supplierAuth, uploadImages.single('logo'), updateSupplierProfile);
 
 export default router;

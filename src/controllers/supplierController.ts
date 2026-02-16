@@ -308,3 +308,107 @@ export const getSupplierInquiries = async (req: any, res: Response) => {
     });
   }
 };
+
+// Update Supplier Profile
+export const updateSupplierProfile = async (req: Request, res: Response) => {
+  try {
+    const supplierId = (req as any).user?.id;
+    
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    console.log('📥 Updating supplier profile:', supplierId);
+    console.log('📋 Request body:', req.body);
+
+    const {
+      companyName,
+      phone,
+      address,
+      city,
+      state,
+      gstNumber,
+      website,
+      description
+    } = req.body;
+
+    // Build update object
+    const updateData: any = {};
+    if (companyName) updateData.companyName = companyName;
+    if (phone) updateData.phone = phone;
+    if (gstNumber) updateData.gstNumber = gstNumber;
+    if (website) updateData.website = website;
+    if (description) updateData.businessDescription = description;
+
+    // Handle address
+    if (address || city || state) {
+      const supplier = await Supplier.findById(supplierId);
+      const currentAddress = (supplier?.address || {}) as any;
+      updateData.address = {
+        ...currentAddress,
+        street: address || currentAddress.street || '',
+        city: city || currentAddress.city || '',
+        state: state || currentAddress.state || ''
+      };
+    }
+
+    // Handle logo upload
+    if (req.file) {
+      try {
+        console.log('📸 Uploading new logo to Cloudinary...');
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'supplier-logos',
+          transformation: [
+            { width: 200, height: 200, crop: 'fill', gravity: 'center' },
+            { quality: 'auto' }
+          ]
+        });
+        updateData.logo = result.secure_url;
+        console.log('✅ Logo uploaded:', result.secure_url);
+      } catch (err) {
+        console.error('❌ Error uploading logo:', err);
+      }
+    }
+
+    // Update supplier
+    const updatedSupplier = await Supplier.findByIdAndUpdate(
+      supplierId,
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedSupplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    console.log('✅ Supplier profile updated:', updatedSupplier._id);
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      supplier: {
+        id: updatedSupplier._id,
+        companyName: updatedSupplier.companyName,
+        email: updatedSupplier.email,
+        phone: updatedSupplier.phone,
+        logo: updatedSupplier.logo,
+        address: updatedSupplier.address,
+        gstNumber: (updatedSupplier as any).gstNumber,
+        website: (updatedSupplier as any).website,
+        businessDescription: updatedSupplier.businessDescription
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Error updating profile:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile'
+    });
+  }
+};

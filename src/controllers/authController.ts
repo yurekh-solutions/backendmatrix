@@ -127,6 +127,7 @@ export const supplierLogin = async (req: Request, res: Response) => {
         id: supplier._id,
         companyName: supplier.companyName,
         email: supplier.email,
+        phone: supplier.phone, // Include phone number
         status: supplier.status,
         logo: supplier.logo,
         profileImage: supplier.logo, // For frontend compatibility
@@ -188,6 +189,7 @@ export const setupSupplierPassword = async (req: Request, res: Response) => {
         id: supplier._id,
         companyName: supplier.companyName,
         email: supplier.email,
+        phone: supplier.phone, // Include phone number
         logo: supplier.logo
       }
     });

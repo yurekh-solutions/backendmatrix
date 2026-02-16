@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Your Data - RitzYard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo h1 {
+            color: #667eea;
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        .title {
+            color: #2d3748;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.6;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            color: #2d3748;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .required {
+            color: #e53e3e;
+        }
+        
+        .info-box {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            color: #4a5568;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .info-box p:last-child {
+            margin-bottom: 0;
+        }
+        
+        .checkbox-group {
+            margin-top: 12px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item label {
+            margin-bottom: 0;
+            font-weight: 400;
+            cursor: pointer;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .message.success {
+            background: #c6f6d5;
+            border: 1px solid #9ae6b4;
+            color: #22543d;
+        }
+        
+        .message.error {
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🏛️ RitzYard</h1>
+        </div>
+        
+        <h2 class="title">Delete Specific Data</h2>
+        <p class="subtitle">Request deletion of specific types of your data while keeping your account active.</p>
+        
+        <div class="info-box">
+            <p><strong>About data deletion:</strong></p>
+            <p>• Your account will remain active</p>
+            <p>• Only the selected data types will be deleted</p>
+            <p>• This process will be completed within 30 days</p>
+            <p>• You'll receive a confirmation email once complete</p>
+            <p>• Some data may be retained as required by law</p>
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <form id="deleteDataForm">
+            <div class="form-group">
+                <label for="userType">Account Type <span class="required">*</span></label>
+                <select id="userType" name="userType" required>
+                    <option value="">Select your account type</option>
+                    <option value="buyer">Buyer/User</option>
+                    <option value="supplier">Supplier/Vendor</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email Address <span class="required">*</span></label>
+                <input type="email" id="email" name="email" placeholder="your@email.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="name">Full Name <span class="required">*</span></label>
+                <input type="text" id="name" name="name" placeholder="Your full name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number (Optional)</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="+1234567890">
+            </div>
+            
+            <div class="form-group">
+                <label>Select Data Types to Delete <span class="required">*</span></label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="profileData" name="dataTypes" value="profile">
+                        <label for="profileData">Profile Information (name, photo, bio)</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="orderHistory" name="dataTypes" value="orders">
+                        <label for="orderHistory">Order History</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="rfqData" name="dataTypes" value="rfqs">
+                        <label for="rfqData">RFQs and Quotes</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="communicationData" name="dataTypes" value="communications">
+                        <label for="communicationData">Communication History</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="analyticsData" name="dataTypes" value="analytics">
+                        <label for="analyticsData">Analytics and Usage Data</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="reason">Reason for Deletion (Optional)</label>
+                <textarea id="reason" name="reason" placeholder="Please tell us why you want this data deleted"></textarea>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submitBtn">Submit Data Deletion Request</button>
+        </form>
+        
+        <div class="footer">
+            <a href="https://backendmatrix.onrender.com/privacy/delete-account-form.html">Delete entire account instead?</a>
+            <span style="margin: 0 10px; color: #e2e8f0;">|</span>
+            <a href="https://backendmatrix.onrender.com/privacy/privacy-policy.html">Privacy Policy</a>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                <p style="color: #718096; font-size: 12px; margin-bottom: 8px;"><strong>Contact Us</strong></p>
+                <p style="color: #718096; font-size: 12px; margin-bottom: 4px;">📧 Email: privacy@ritzyard.ai</p>
+                <p style="color: #718096; font-size: 12px; margin-bottom: 4px;">📞 Phone: +91 9559262525</p>
+                <p style="color: #718096; font-size: 12px; margin-bottom: 4px;">📍 Address: 01 RR DM Road Vakola Bridge, Santacurz Mumbai 400055, INDIA</p>
+                <p style="color: #718096; font-size: 12px; margin-top: 8px;">Data Protection Officer: dpo@ritzyard.ai</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://backendmatrix.onrender.com/api/privacy/delete-data';
+        
+        document.getElementById('deleteDataForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const messageDiv = document.getElementById('message');
+            
+            // Get selected data types
+            const checkboxes = document.querySelectorAll('input[name="dataTypes"]:checked');
+            const dataTypes = Array.from(checkboxes).map(cb => cb.value);
+            
+            // Validate at least one data type is selected
+            if (dataTypes.length === 0) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'Please select at least one data type to delete';
+                messageDiv.style.display = 'block';
+                messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+            
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            // Hide previous messages
+            messageDiv.style.display = 'none';
+            
+            // Collect form data
+            const formData = {
+                userType: document.getElementById('userType').value,
+                email: document.getElementById('email').value,
+                name: document.getElementById('name').value,
+                phoneNumber: document.getElementById('phoneNumber').value || undefined,
+                reason: document.getElementById('reason').value || undefined,
+                dataTypes: dataTypes
+            };
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = data.message;
+                    messageDiv.style.display = 'block';
+                    
+                    // Reset form
+                    document.getElementById('deleteDataForm').reset();
+                    
+                    // Scroll to message
+                    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    throw new Error(data.message || 'Failed to submit request');
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = error.message || 'An error occurred. Please try again later.';
+                messageDiv.style.display = 'block';
+                messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Data Deletion Request';
+            }
+        });
+    </script>
+</body>
+</html>
