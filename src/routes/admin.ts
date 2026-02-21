@@ -22,7 +22,7 @@ import {
   getPerformanceAnalytics,
   getAutomationStats
 } from '../controllers/automationController';
-import { getAllRFQs } from '../controllers/rfqController';
+import { getAllRFQs, approveRFQ, rejectRFQ } from '../controllers/rfqController';
 import { authenticateAdmin } from '../middleware/auth';
 
 const router = express.Router();
@@ -59,5 +59,7 @@ router.get('/automation/metrics', getPerformanceAnalytics);
 
 // RFQ routes
 router.get('/rfqs', getAllRFQs);
+router.put('/rfqs/:id/approve', approveRFQ);
+router.put('/rfqs/:id/reject', rejectRFQ);
 
 export default router;

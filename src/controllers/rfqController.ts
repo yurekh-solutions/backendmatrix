@@ -177,3 +177,87 @@ export const getAllRFQs = async (req: Request, res: Response) => {
     });
   }
 };
+
+// Admin: Approve RFQ
+export const approveRFQ = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const rfq = await RFQ.findById(id);
+
+    if (!rfq) {
+      return res.status(404).json({
+        success: false,
+        message: 'RFQ not found',
+      });
+    }
+
+    if (rfq.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'RFQ is not in pending status',
+      });
+    }
+
+    rfq.status = 'accepted';
+    await rfq.save();
+
+    // TODO: Send WhatsApp notification to customer
+
+    res.json({
+      success: true,
+      message: 'RFQ approved successfully',
+      data: rfq,
+    });
+  } catch (error: any) {
+    console.error('❌ Error approving RFQ:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve RFQ',
+    });
+  }
+};
+
+// Admin: Reject RFQ
+export const rejectRFQ = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const rfq = await RFQ.findById(id);
+
+    if (!rfq) {
+      return res.status(404).json({
+        success: false,
+        message: 'RFQ not found',
+      });
+    }
+
+    if (rfq.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'RFQ is not in pending status',
+      });
+    }
+
+    rfq.status = 'rejected';
+    if (reason) {
+      rfq.adminNotes = reason;
+    }
+    await rfq.save();
+
+    // TODO: Send WhatsApp notification to customer
+
+    res.json({
+      success: true,
+      message: 'RFQ rejected successfully',
+      data: rfq,
+    });
+  } catch (error: any) {
+    console.error('❌ Error rejecting RFQ:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject RFQ',
+    });
+  }
+};
