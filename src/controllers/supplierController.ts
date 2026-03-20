@@ -277,34 +277,131 @@ export const getSupplierInquiries = async (req: any, res: Response) => {
       .sort({ createdAt: -1 })
       .limit(500);
 
-    // Transform leads to inquiry format
+    // Transform leads to inquiry format with enhanced details
     const formattedInquiries = inquiries.map((inquiry: any) => ({
       _id: inquiry._id,
       productId: inquiry.productId || 'N/A',
       productName: inquiry.productName || inquiry.company || 'Product Inquiry',
       buyerName: inquiry.name || 'Buyer',
       buyerEmail: inquiry.email || 'N/A',
+      buyerPhone: inquiry.phone || 'N/A',
+      buyerCompany: inquiry.company || 'Individual',
       quantity: inquiry.quantity || 0,
       unit: inquiry.unit || 'units',
       budget: inquiry.budget || `₹${(inquiry.potential || 0).toLocaleString()}`,
-      description: inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
+      description: inquiry.message || inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
       status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
+      score: inquiry.score || 50,
+      tags: inquiry.tags || [],
       createdAt: inquiry.createdAt,
       updatedAt: inquiry.updatedAt
     }));
+
+    // Calculate stats
+    const stats = {
+      total: inquiries.length,
+      new: inquiries.filter((i: any) => i.status === 'new').length,
+      responded: inquiries.filter((i: any) => i.status === 'contacted').length,
+      qualified: inquiries.filter((i: any) => i.status === 'qualified').length,
+      converted: inquiries.filter((i: any) => i.status === 'converted').length,
+    };
 
     console.log(`✅ Found ${formattedInquiries.length} inquiries`);
 
     res.json({
       success: true,
       inquiries: formattedInquiries,
-      count: formattedInquiries.length
+      count: formattedInquiries.length,
+      stats
     });
   } catch (error: any) {
     console.error('❌ Error fetching inquiries:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch inquiries'
+    });
+  }
+};
+
+// Get unread/new inquiry count for notification badge
+export const getUnreadInquiryCount = async (req: any, res: Response) => {
+  try {
+    const supplierId = req.supplier?._id;
+    
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    const unreadCount = await Lead.countDocuments({ 
+      supplierId, 
+      status: 'new' 
+    });
+
+    res.json({
+      success: true,
+      unreadCount
+    });
+  } catch (error: any) {
+    console.error('❌ Error fetching unread count:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch unread count'
+    });
+  }
+};
+
+// Respond to an inquiry (update lead status and add note)
+export const respondToInquiry = async (req: any, res: Response) => {
+  try {
+    const supplierId = req.supplier?._id;
+    const { inquiryId } = req.params;
+    const { message, quotedPrice, status } = req.body;
+    
+    if (!supplierId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    const lead = await Lead.findOne({ _id: inquiryId, supplierId });
+    
+    if (!lead) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inquiry not found'
+      });
+    }
+
+    // Update lead status
+    lead.status = status || 'contacted';
+    
+    // Add note/response (store in tags for now, could create a separate responses array)
+    if (message) {
+      lead.tags = [...(lead.tags || []), `Response: ${message.substring(0, 50)}`];
+    }
+    
+    await lead.save();
+
+    console.log(`✅ Inquiry ${inquiryId} updated by supplier ${supplierId}`);
+
+    res.json({
+      success: true,
+      message: 'Response recorded successfully',
+      data: {
+        inquiryId,
+        status: lead.status,
+        quotedPrice
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Error responding to inquiry:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to respond to inquiry'
     });
   }
 };

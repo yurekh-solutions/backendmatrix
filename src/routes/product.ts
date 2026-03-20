@@ -8,6 +8,7 @@ const router = express.Router();
 // Public routes
 router.get('/public', productController.getAllProducts);
 router.get('/public/:id', productController.getProductById);
+router.get('/suppliers/:category', productController.getSuppliersByCategory);
 
 // Supplier routes (protected) - Use uploadProductImage for product images
 router.post('/', supplierAuth, uploadProductImage.single('productImage'), productController.addProduct);

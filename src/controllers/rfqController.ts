@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import RFQ from '../models/RFQ';
 import { AuthRequest } from '../middleware/auth';
 import { notifyRFQViaWhatsApp, sendRFQToWhatsApp } from '../utils/whatsappService';
+import { routeInquiryToSuppliers } from '../services/inquiryRoutingService';
 
 // Customer: Submit RFQ
 export const submitRFQ = async (req: Request, res: Response) => {
@@ -56,6 +57,35 @@ export const submitRFQ = async (req: Request, res: Response) => {
       console.error('⚠️  WhatsApp notification error (non-blocking):', whatsappError);
       // Continue - don't fail RFQ submission due to WhatsApp error
     }
+
+    // Route RFQ to matching suppliers (fire and forget)
+    (async () => {
+      try {
+        console.log('\n🚀 Routing RFQ to matching suppliers...');
+        // Convert RFQ items to material format for routing
+        const materials = items.map(item => ({
+          materialName: item.productName,
+          category: item.category || 'General',
+          quantity: item.quantity || 1,
+          unit: 'MT'
+        }));
+
+        const routingResult = await routeInquiryToSuppliers({
+          inquiryId: rfqs[0]._id.toString(),
+          inquiryNumber: `RFQ-${Date.now()}`,
+          customerName,
+          companyName: company,
+          email,
+          phone,
+          materials,
+          deliveryLocation: location || 'India',
+          totalEstimatedValue: undefined,
+        });
+        console.log('✅ RFQ routing complete:', routingResult);
+      } catch (routingError: any) {
+        console.error('⚠️  RFQ routing error (background task, non-blocking):', routingError.message);
+      }
+    })(); // FIRE AND FORGET
 
     res.status(201).json({
       success: true,

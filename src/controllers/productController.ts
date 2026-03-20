@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Product from '../models/Product';
 import Category from '../models/Category';
+import Supplier from '../models/Supplier';
 import { AuthRequest } from '../middleware/auth';
 
 /**
@@ -410,6 +411,71 @@ export const getProductById = async (req: any, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch product',
+    });
+  }
+};
+
+// Public: Get suppliers by category (for showing "X verified suppliers" on product pages)
+export const getSuppliersByCategory = async (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category is required',
+      });
+    }
+
+    // Find suppliers who offer products in this category
+    // Strategy 1: Check productsOffered array
+    const suppliersByOffered = await Supplier.find({
+      status: 'approved',
+      isActive: true,
+      productsOffered: { 
+        $elemMatch: { 
+          $regex: new RegExp(category, 'i') 
+        } 
+      }
+    }).select('companyName logo address.city yearsInBusiness').lean();
+
+    // Strategy 2: Check actual products listed by suppliers
+    const supplierIdsByProducts = await Product.distinct('supplierId', {
+      status: 'active',
+      category: { $regex: new RegExp(category, 'i') }
+    });
+
+    const suppliersWithProducts = await Supplier.find({
+      _id: { $in: supplierIdsByProducts },
+      status: 'approved',
+      isActive: true
+    }).select('companyName logo address.city yearsInBusiness').lean();
+
+    // Merge and deduplicate
+    const allSuppliers = [...suppliersByOffered, ...suppliersWithProducts];
+    const uniqueSuppliers = allSuppliers.reduce((acc: any[], supplier) => {
+      if (!acc.find(s => s._id.toString() === supplier._id.toString())) {
+        acc.push(supplier);
+      }
+      return acc;
+    }, []);
+
+    res.json({
+      success: true,
+      count: uniqueSuppliers.length,
+      suppliers: uniqueSuppliers.map(s => ({
+        id: s._id,
+        name: s.companyName,
+        logo: s.logo,
+        city: s.address?.city || 'India',
+        experience: s.yearsInBusiness || 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching suppliers by category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch suppliers',
     });
   }
 };

@@ -124,10 +124,12 @@ export const supplierLogin = async (req: Request, res: Response) => {
       success: true,
       token,
       user: {
-        id: supplier._id,
+        _id: supplier._id, // Mobile app expects _id
+        id: supplier._id, // Web app might expect id
         companyName: supplier.companyName,
         email: supplier.email,
         phone: supplier.phone, // Include phone number
+        contactPerson: supplier.contactPerson, // Mobile app expects contactPerson
         status: supplier.status,
         logo: supplier.logo,
         profileImage: supplier.logo, // For frontend compatibility
@@ -186,10 +188,13 @@ export const setupSupplierPassword = async (req: Request, res: Response) => {
       message: 'Password set up successfully',
       token,
       user: {
-        id: supplier._id,
+        _id: supplier._id, // Mobile app expects _id
+        id: supplier._id, // Web app might expect id
         companyName: supplier.companyName,
         email: supplier.email,
         phone: supplier.phone, // Include phone number
+        contactPerson: supplier.contactPerson, // Mobile app expects contactPerson
+        status: supplier.status,
         logo: supplier.logo
       }
     });

@@ -3,6 +3,7 @@ import MaterialInquiry from '../models/MaterialInquiry';
 import { AuthRequest } from '../middleware/auth';
 import Supplier from '../models/Supplier';
 import { notifyMaterialInquiryViaWhatsApp } from '../utils/whatsappService';
+import { routeInquiryToSuppliers } from '../services/inquiryRoutingService';
 
 // Public: Submit a new material inquiry (bulk order)
 export const submitMaterialInquiry = async (req: Request, res: Response) => {
@@ -114,6 +115,29 @@ export const submitMaterialInquiry = async (req: Request, res: Response) => {
       } catch (whatsappError: any) {
         console.error('⚠️  WhatsApp notification error (background task, non-blocking):', whatsappError.message);
         console.log('Note: Inquiry was saved successfully despite WhatsApp error\n');
+      }
+    })(); // FIRE AND FORGET - don't await
+
+    // Route inquiry to matching suppliers (fire and forget)
+    // Creates Lead records and generates WhatsApp notification URLs for suppliers
+    (async () => {
+      try {
+        console.log('\n🚀 Routing inquiry to matching suppliers...');
+        const routingResult = await routeInquiryToSuppliers({
+          inquiryId: savedInquiry._id.toString(),
+          inquiryNumber: savedInquiry.inquiryNumber!,
+          customerName,
+          companyName,
+          email,
+          phone,
+          materials: processedMaterials,
+          deliveryLocation,
+          totalEstimatedValue: totalEstimatedValue ? Number(totalEstimatedValue) : undefined,
+        });
+        console.log('✅ Inquiry routing complete:', routingResult);
+      } catch (routingError: any) {
+        console.error('⚠️  Inquiry routing error (background task, non-blocking):', routingError.message);
+        console.log('Note: Inquiry was saved successfully despite routing error\n');
       }
     })(); // FIRE AND FORGET - don't await
 
