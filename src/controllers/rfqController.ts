@@ -17,24 +17,41 @@ export const submitRFQ = async (req: Request, res: Response) => {
       });
     }
 
-    // Create RFQ for each item in the cart
-    const rfqs = await Promise.all(
-      items.map(item => {
-        const rfq = new RFQ({
-          customerName,
-          email,
-          phone,
-          company,
-          deliveryLocation: location,
-          productCategory: item.category,
-          productName: item.productName,
-          quantity: item.quantity,
-          unit: 'MT', // Default unit for metal/materials
-          status: 'pending'
-        });
-        return rfq.save();
-      })
-    );
+    // Helper: save a single RFQ item with duplicate-key retry
+    const saveRFQItem = async (item: any, retries = 5): Promise<any> => {
+      const rfq = new RFQ({
+        customerName, email, phone, company,
+        deliveryLocation: location,
+        productCategory: item.category,
+        productName: item.productName,
+        quantity: item.quantity,
+        unit: 'MT',
+        status: 'pending',
+      });
+      try {
+        return await rfq.save();
+      } catch (err: any) {
+        // E11000 = MongoDB duplicate key — regenerate number and retry
+        if (err.code === 11000 && retries > 0) {
+          const now = new Date();
+          const y  = now.getFullYear().toString().slice(-2);
+          const m  = (now.getMonth() + 1).toString().padStart(2, '0');
+          const d  = now.getDate().toString().padStart(2, '0');
+          const ts = Date.now().toString().slice(-6);
+          const rnd = Math.floor(Math.random() * 9000 + 1000);
+          rfq.inquiryNumber = `RFQ${y}${m}${d}${ts}${rnd}`;
+          return saveRFQItem(item, retries - 1);
+        }
+        throw err;
+      }
+    };
+
+    // Save items sequentially to avoid race conditions
+    const rfqs: any[] = [];
+    for (const item of items) {
+      const saved = await saveRFQItem(item);
+      rfqs.push(saved);
+    }
 
     // Send WhatsApp notification
     try {
