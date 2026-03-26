@@ -520,6 +520,69 @@ export const bulkUpdateInquiries = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// Public: Track inquiry by email + inquiry number (buyer tracking)
+export const trackInquiry = async (req: Request, res: Response) => {
+  try {
+    const { email, inquiryNumber } = req.query;
+
+    if (!email || !inquiryNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and inquiry number are required',
+      });
+    }
+
+    const inquiry = await MaterialInquiry.findOne({
+      email: (email as string).toLowerCase().trim(),
+      inquiryNumber: inquiryNumber as string,
+    }).populate('supplierQuotes.supplierId', 'companyName');
+
+    if (!inquiry) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inquiry not found. Please check your email and inquiry number.',
+      });
+    }
+
+    // Return safe buyer-facing data only (no internal notes, no supplier contact details)
+    const safeQuotes = (inquiry.supplierQuotes || []).map((q: any) => ({
+      supplierName: q.supplierName,
+      quotedPrice: q.quotedPrice,
+      notes: q.notes,
+      quotedDate: q.quotedDate,
+      validUntil: q.validUntil,
+      status: q.status,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        inquiryNumber: inquiry.inquiryNumber,
+        customerName: inquiry.customerName,
+        status: inquiry.status,
+        priority: inquiry.priority,
+        materials: inquiry.materials.map(m => ({
+          materialName: m.materialName,
+          category: m.category,
+          quantity: m.quantity,
+          unit: m.unit,
+        })),
+        deliveryLocation: inquiry.deliveryLocation,
+        createdAt: inquiry.createdAt,
+        updatedAt: inquiry.updatedAt,
+        supplierQuotes: safeQuotes,
+        ritzYardWhatsApp: 'https://wa.me/919136242706?text=' + encodeURIComponent(`Hi RitzYard, I want to follow up on inquiry #${inquiry.inquiryNumber}`),
+      },
+    });
+  } catch (error: any) {
+    console.error('❌ Error tracking inquiry:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch inquiry',
+    });
+  }
+};
+
 // Get inquiry statistics
 export const getInquiryStatistics = async (req: Request, res: Response) => {
   try {

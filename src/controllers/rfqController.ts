@@ -72,7 +72,7 @@ export const submitRFQ = async (req: Request, res: Response) => {
 
         const routingResult = await routeInquiryToSuppliers({
           inquiryId: rfqs[0]._id.toString(),
-          inquiryNumber: `RFQ-${Date.now()}`,
+          inquiryNumber: rfqs[0].inquiryNumber,
           customerName,
           companyName: company,
           email,
@@ -91,6 +91,7 @@ export const submitRFQ = async (req: Request, res: Response) => {
       success: true,
       message: `RFQ submitted successfully for ${rfqs.length} product(s). We will contact you soon via WhatsApp.`,
       data: rfqs,
+      rfqNumber: rfqs[0]?.inquiryNumber || null,
     });
   } catch (error: any) {
     console.error('❌ RFQ submission error:', error.message, error);
@@ -288,6 +289,98 @@ export const rejectRFQ = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to reject RFQ',
+    });
+  }
+};
+
+// Public: Track RFQ by email + inquiry number (buyer tracking)
+export const trackRFQ = async (req: Request, res: Response) => {
+  try {
+    const { email, inquiryNumber } = req.query;
+
+    if (!email || !inquiryNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and inquiry number are required',
+      });
+    }
+
+    const rfq = await RFQ.findOne({
+      email: (email as string).toLowerCase().trim(),
+      inquiryNumber: inquiryNumber as string,
+    }).populate('assignedSupplier', 'companyName');
+
+    if (!rfq) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inquiry not found. Please check your email and inquiry number.',
+      });
+    }
+
+    // Build safe supplier quote if exists
+    const supplierQuotes = [];
+    if (rfq.supplierResponse?.quotedPrice) {
+      const supplierName = (rfq.assignedSupplier as any)?.companyName || 'RitzYard Verified Supplier';
+      supplierQuotes.push({
+        supplierName,
+        quotedPrice: rfq.supplierResponse.quotedPrice,
+        notes: rfq.supplierResponse.notes,
+        quotedDate: rfq.supplierResponse.quotedDate,
+        status: rfq.status,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        inquiryNumber: rfq.inquiryNumber,
+        customerName: rfq.customerName,
+        status: rfq.status === 'pending' ? 'new' : rfq.status,
+        priority: 'normal',
+        materials: [{
+          materialName: rfq.productName,
+          category: rfq.productCategory,
+          quantity: rfq.quantity,
+          unit: rfq.unit,
+        }],
+        deliveryLocation: rfq.deliveryLocation,
+        createdAt: rfq.createdAt,
+        updatedAt: rfq.updatedAt,
+        supplierQuotes,
+        ritzYardWhatsApp: 'https://wa.me/919136242706?text=' + encodeURIComponent(`Hi RitzYard, I want to follow up on inquiry #${rfq.inquiryNumber}`),
+      },
+    });
+  } catch (error: any) {
+    console.error('❌ Error tracking RFQ:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch inquiry',
+    });
+  }
+};
+
+export const deleteRFQ = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const rfq = await RFQ.findByIdAndDelete(id);
+
+    if (!rfq) {
+      return res.status(404).json({
+        success: false,
+        message: 'RFQ not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'RFQ deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('❌ Error deleting RFQ:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete RFQ',
     });
   }
 };

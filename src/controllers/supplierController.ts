@@ -1,9 +1,16 @@
  import { Request, Response } from 'express';
 import Supplier from '../models/Supplier';
 import Lead from '../models/Lead';
+import MaterialInquiry from '../models/MaterialInquiry';
+import RFQ from '../models/RFQ';
+import InquiryMessage from '../models/InquiryMessage';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import cloudinary from '../config/cloudinary';
+import { generateWhatsAppWebURL } from '../utils/whatsappService';
+
+// RitzYard admin WhatsApp number for all notifications
+const RITZYARD_ADMIN_PHONE = process.env.RITZYARD_ADMIN_PHONE || '919136242706';
 
 export const submitOnboarding = async (req: Request, res: Response) => {
   try {
@@ -272,46 +279,152 @@ export const getSupplierInquiries = async (req: any, res: Response) => {
 
     console.log('🚀 Fetching inquiries for supplier:', supplierId);
 
-    // Fetch all leads for this supplier
-    const inquiries = await Lead.find({ supplierId })
-      .sort({ createdAt: -1 })
-      .limit(500);
+    // Get supplier's approved categories
+    const supplier = await Supplier.findById(supplierId).select('productsOffered status');
+    const supplierCategories: string[] = (supplier?.productsOffered || []).map((p: string) => p.toLowerCase());
 
-    // Transform leads to inquiry format with enhanced details
-    const formattedInquiries = inquiries.map((inquiry: any) => ({
-      _id: inquiry._id,
-      productId: inquiry.productId || 'N/A',
-      productName: inquiry.productName || inquiry.company || 'Product Inquiry',
-      buyerName: inquiry.name || 'Buyer',
-      buyerEmail: inquiry.email || 'N/A',
-      buyerPhone: inquiry.phone || 'N/A',
-      buyerCompany: inquiry.company || 'Individual',
-      quantity: inquiry.quantity || 0,
-      unit: inquiry.unit || 'units',
-      budget: inquiry.budget || `₹${(inquiry.potential || 0).toLocaleString()}`,
-      description: inquiry.message || inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
-      status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
-      score: inquiry.score || 50,
-      tags: inquiry.tags || [],
-      createdAt: inquiry.createdAt,
-      updatedAt: inquiry.updatedAt
+    // 1. Lead-based inquiries (directly assigned)
+    const leads = await Lead.find({ supplierId })
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    const leadInquiries = leads.map((inquiry: any) => {
+      // Use inquiryRef if present (set by routing service), else use _id as thread key
+      const chatThreadId = inquiry.inquiryRef || inquiry._id.toString();
+      return {
+        _id: inquiry._id,
+        sourceType: 'lead',
+        chatThreadId,
+        productId: inquiry.productId || 'N/A',
+        productName: inquiry.productName || inquiry.company || 'Product Inquiry',
+        buyerName: inquiry.name || 'Buyer',
+        buyerEmail: '(Protected by RitzYard)',
+        buyerPhone: 'Contact via RitzYard Portal',
+        buyerCompany: inquiry.company || 'Individual',
+        quantity: inquiry.quantity || 0,
+        unit: inquiry.unit || 'units',
+        budget: inquiry.budget || `₹${(inquiry.potential || 0).toLocaleString()}`,
+        description: inquiry.message || inquiry.description || `Inquiry for ${inquiry.company || 'product'}`,
+        status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
+        score: inquiry.score || 50,
+        tags: inquiry.tags || [],
+        createdAt: inquiry.createdAt,
+        updatedAt: inquiry.updatedAt
+      };
+    });
+
+    // 2. Material Inquiries matching supplier categories (only if supplier is approved)
+    let materialInquiries: any[] = [];
+    let rfqInquiries: any[] = [];
+
+    if (supplier?.status === 'approved' && supplierCategories.length > 0) {
+      // Build regex patterns to match categories loosely
+      const categoryPatterns = supplierCategories.map((c: string) => new RegExp(c.replace(/[-/]/g, '.'), 'i'));
+
+      const miDocs = await MaterialInquiry.find({
+        'materials.category': { $in: categoryPatterns }
+      }).sort({ createdAt: -1 }).limit(100);
+
+      materialInquiries = miDocs.map((mi: any) => {
+        const firstMat = mi.materials[0] || {};
+        const allMats = mi.materials.map((m: any) => `${m.materialName} (${m.quantity} ${m.unit})`).join(', ');
+        return {
+          _id: `mi_${mi._id}`,
+          sourceType: 'material_inquiry',
+          chatThreadId: mi.inquiryNumber,
+          inquiryNumber: mi.inquiryNumber,
+          productId: mi._id.toString(),
+          productName: firstMat.materialName || 'Material Inquiry',
+          buyerName: mi.customerName || 'Buyer',
+          buyerEmail: '(Protected by RitzYard)',
+          buyerPhone: 'Contact via RitzYard Portal',
+          buyerCompany: mi.companyName || 'Individual',
+          quantity: firstMat.quantity || 0,
+          unit: firstMat.unit || 'MT',
+          budget: mi.totalEstimatedValue ? `₹${mi.totalEstimatedValue.toLocaleString()}` : 'Open to quotes',
+          description: `Materials needed: ${allMats}. Delivery: ${mi.deliveryLocation}.${mi.additionalRequirements ? ' ' + mi.additionalRequirements : ''}`,
+          status: mi.status === 'new' ? 'new' : mi.status === 'quoted' ? 'quoted' : mi.status === 'accepted' ? 'converted' : 'new',
+          score: 70,
+          tags: mi.materials.map((m: any) => m.category).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i),
+          createdAt: mi.createdAt,
+          updatedAt: mi.updatedAt
+        };
+      });
+
+      // 3. RFQ matching supplier categories
+      const rfqDocs = await RFQ.find({
+        productCategory: { $in: categoryPatterns }
+      }).sort({ createdAt: -1 }).limit(100);
+
+      rfqInquiries = rfqDocs.map((rfq: any) => ({
+        _id: `rfq_${rfq._id}`,
+        sourceType: 'rfq',
+        chatThreadId: rfq.inquiryNumber,
+        inquiryNumber: rfq.inquiryNumber,
+        productId: rfq._id.toString(),
+        productName: rfq.productName || rfq.productCategory || 'RFQ',
+        buyerName: rfq.customerName || 'Buyer',
+        buyerEmail: '(Protected by RitzYard)',
+        buyerPhone: 'Contact via RitzYard Portal',
+        buyerCompany: rfq.company || 'Individual',
+        quantity: rfq.quantity || 0,
+        unit: rfq.unit || 'MT',
+        budget: 'Open to quotes',
+        description: `RFQ for ${rfq.productName} (${rfq.productCategory}). Qty: ${rfq.quantity} ${rfq.unit}. Location: ${rfq.deliveryLocation}.${rfq.specifications ? ' Specs: ' + rfq.specifications : ''}`,
+        status: rfq.status === 'pending' ? 'new' : rfq.status === 'quoted' ? 'quoted' : rfq.status === 'accepted' ? 'converted' : 'responded',
+        score: 65,
+        tags: [rfq.productCategory].filter(Boolean),
+        createdAt: rfq.createdAt,
+        updatedAt: rfq.updatedAt
+      }));
+    }
+
+    // Merge all, deduplicate by _id, sort newest first
+    const allInquiries = [...leadInquiries, ...materialInquiries, ...rfqInquiries]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Attach unread message counts per thread
+    const threadIds = allInquiries
+      .map((i: any) => i.chatThreadId)
+      .filter(Boolean);
+
+    const unreadCounts: Record<string, number> = {};
+    if (threadIds.length > 0) {
+      const unreadAgg = await InquiryMessage.aggregate([
+        {
+          $match: {
+            inquiryId: { $in: threadIds },
+            senderRole: 'buyer',
+            readBy: { $ne: supplierId.toString() },
+          },
+        },
+        { $group: { _id: '$inquiryId', count: { $sum: 1 } } },
+      ]);
+      for (const row of unreadAgg) {
+        unreadCounts[row._id] = row.count;
+      }
+    }
+
+    const allWithUnread = allInquiries.map((i: any) => ({
+      ...i,
+      unreadMessages: unreadCounts[i.chatThreadId] || 0,
     }));
 
     // Calculate stats
     const stats = {
-      total: inquiries.length,
-      new: inquiries.filter((i: any) => i.status === 'new').length,
-      responded: inquiries.filter((i: any) => i.status === 'contacted').length,
-      qualified: inquiries.filter((i: any) => i.status === 'qualified').length,
-      converted: inquiries.filter((i: any) => i.status === 'converted').length,
+      total: allWithUnread.length,
+      new: allWithUnread.filter((i: any) => i.status === 'new').length,
+      responded: allWithUnread.filter((i: any) => i.status === 'responded').length,
+      qualified: allWithUnread.filter((i: any) => i.status === 'quoted').length,
+      converted: allWithUnread.filter((i: any) => i.status === 'converted').length,
     };
 
-    console.log(`✅ Found ${formattedInquiries.length} inquiries`);
+    console.log(`✅ Found ${leadInquiries.length} leads + ${materialInquiries.length} MIs + ${rfqInquiries.length} RFQs = ${allWithUnread.length} total`);
 
     res.json({
       success: true,
-      inquiries: formattedInquiries,
-      count: formattedInquiries.length,
+      inquiries: allWithUnread,
+      count: allWithUnread.length,
       stats
     });
   } catch (error: any) {
@@ -379,12 +492,36 @@ export const respondToInquiry = async (req: any, res: Response) => {
     // Update lead status
     lead.status = status || 'contacted';
     
-    // Add note/response (store in tags for now, could create a separate responses array)
+    // Store quoted price and message on the lead
+    if (quotedPrice) {
+      (lead as any).quotedPrice = parseFloat(quotedPrice);
+      (lead as any).quoteStatus = 'pending_admin';
+    }
     if (message) {
-      lead.tags = [...(lead.tags || []), `Response: ${message.substring(0, 50)}`];
+      (lead as any).quoteMessage = message;
+      lead.tags = [...(lead.tags || []), `Quote: ${message.substring(0, 50)}`];
     }
     
     await lead.save();
+
+    // Get supplier info for notification
+    const supplier = await Supplier.findById(supplierId).select('companyName');
+    const supplierName = supplier?.companyName || 'Supplier';
+
+    // Notify RitzYard admin via WhatsApp (fire and forget)
+    try {
+      const adminMsg = `🏭 *QUOTE RECEIVED - RitzYard Marketplace*\n\n` +
+        `📋 Inquiry Lead: ${lead._id}\n` +
+        `🏢 Supplier: ${supplierName}\n` +
+        `📦 Product: ${(lead as any).productName || 'Product Inquiry'}\n` +
+        (quotedPrice ? `💰 Quoted Price: ₹${parseFloat(quotedPrice).toLocaleString()}\n` : '') +
+        (message ? `💬 Message: ${message.substring(0, 100)}\n` : '') +
+        `\n👉 Login to Admin Panel to review and approve this quote.`;
+      const waUrl = generateWhatsAppWebURL(RITZYARD_ADMIN_PHONE, adminMsg);
+      console.log('📲 Admin WhatsApp notification URL:', waUrl.substring(0, 80) + '...');
+    } catch (notifyErr) {
+      console.warn('WhatsApp notify failed (non-blocking):', notifyErr);
+    }
 
     console.log(`✅ Inquiry ${inquiryId} updated by supplier ${supplierId}`);
 

@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IRFQ extends Document {
   userId?: string;
+  inquiryNumber?: string;
   customerName: string;
   email: string;
   phone: string;
@@ -85,8 +86,21 @@ const RFQSchema = new Schema<IRFQ>(
       notes: String,
     },
     adminNotes: String,
+    inquiryNumber: { type: String, unique: true, sparse: true },
   },
   { timestamps: true }
 );
+
+// Auto-generate inquiry number before saving
+RFQSchema.pre('save', async function (next) {
+  if (this.isNew && !this.inquiryNumber) {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const count = await mongoose.model('RFQ').countDocuments();
+    this.inquiryNumber = `RFQ${year}${month}${(count + 1).toString().padStart(5, '0')}`;
+  }
+  next();
+});
 
 export default mongoose.model<IRFQ>('RFQ', RFQSchema);

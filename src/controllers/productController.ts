@@ -419,6 +419,7 @@ export const getProductById = async (req: any, res: Response) => {
 export const getSuppliersByCategory = async (req: Request, res: Response) => {
   try {
     const { category } = req.params;
+    const productName = req.query.productName as string | undefined;
     
     if (!category) {
       return res.status(400).json({
@@ -427,33 +428,52 @@ export const getSuppliersByCategory = async (req: Request, res: Response) => {
       });
     }
 
-    // Find suppliers who offer products in this category
-    // Strategy 1: Check productsOffered array
-    const suppliersByOffered = await Supplier.find({
-      status: 'approved',
-      isActive: true,
-      productsOffered: { 
-        $elemMatch: { 
-          $regex: new RegExp(category, 'i') 
-        } 
-      }
-    }).select('companyName logo address.city yearsInBusiness').lean();
+    // Build product name keywords for precise matching
+    // Extract meaningful words (3+ chars) from the product name
+    const nameKeywords = productName
+      ? productName
+          .split(/\s+/)
+          .filter(w => w.length >= 3)
+          .map(w => w.replace(/[^a-zA-Z0-9]/g, ''))
+          .filter(Boolean)
+      : [];
 
-    // Strategy 2: Check actual products listed by suppliers
-    const supplierIdsByProducts = await Product.distinct('supplierId', {
-      status: 'active',
-      category: { $regex: new RegExp(category, 'i') }
-    });
+    let supplierIdsByProducts: any[] = [];
+
+    if (nameKeywords.length > 0) {
+      // Primary: find suppliers whose products match both category AND product name keywords
+      const nameRegex = new RegExp(nameKeywords.slice(0, 3).join('|'), 'i');
+      const exactMatches = await Product.distinct('supplierId', {
+        status: 'active',
+        category: { $regex: new RegExp(category, 'i') },
+        name: { $regex: nameRegex },
+      });
+
+      if (exactMatches.length > 0) {
+        supplierIdsByProducts = exactMatches;
+      } else {
+        // Fallback to category-only if no name match found
+        supplierIdsByProducts = await Product.distinct('supplierId', {
+          status: 'active',
+          category: { $regex: new RegExp(category, 'i') },
+        });
+      }
+    } else {
+      // No product name provided — category match only
+      supplierIdsByProducts = await Product.distinct('supplierId', {
+        status: 'active',
+        category: { $regex: new RegExp(category, 'i') },
+      });
+    }
 
     const suppliersWithProducts = await Supplier.find({
       _id: { $in: supplierIdsByProducts },
       status: 'approved',
-      isActive: true
+      isActive: true,
     }).select('companyName logo address.city yearsInBusiness').lean();
 
-    // Merge and deduplicate
-    const allSuppliers = [...suppliersByOffered, ...suppliersWithProducts];
-    const uniqueSuppliers = allSuppliers.reduce((acc: any[], supplier) => {
+    // Deduplicate
+    const uniqueSuppliers = suppliersWithProducts.reduce((acc: any[], supplier) => {
       if (!acc.find(s => s._id.toString() === supplier._id.toString())) {
         acc.push(supplier);
       }

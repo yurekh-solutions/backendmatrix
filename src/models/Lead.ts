@@ -11,7 +11,11 @@ export interface ILead extends Document {
   score?: number;
   status: 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted';
   tags: string[];
-  assignedTo?: mongoose.Types.ObjectId; // Admin or Sales person
+  assignedTo?: mongoose.Types.ObjectId;
+  quotedPrice?: number;
+  quoteMessage?: string;
+  quoteStatus?: 'pending_admin' | 'approved' | 'rejected';
+  inquiryRef?: string; // inquiry number for tracking
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +61,20 @@ const leadSchema = new Schema<ILead>({
   assignedTo: {
     type: Schema.Types.ObjectId,
     ref: 'Admin'
+  },
+  quotedPrice: {
+    type: Number
+  },
+  quoteMessage: {
+    type: String
+  },
+  quoteStatus: {
+    type: String,
+    enum: ['pending_admin', 'approved', 'rejected'],
+    default: undefined
+  },
+  inquiryRef: {
+    type: String
   }
 }, {
   timestamps: true

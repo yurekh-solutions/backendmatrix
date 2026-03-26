@@ -7,6 +7,7 @@ const router = express.Router();
 // Public routes
 router.post('/', rfqController.submitRFQ);
 router.get('/customer', rfqController.getCustomerRFQs);
+router.get('/track', rfqController.trackRFQ);
 
 // Supplier routes (protected)
 router.get('/supplier/my-rfqs', supplierAuth, rfqController.getSupplierRFQs);

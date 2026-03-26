@@ -4,6 +4,10 @@ import Lead from '../models/Lead';
 import OrderAutomation from '../models/OrderAutomation';
 import Analytics from '../models/Analytics';
 import Product from '../models/Product';
+import MaterialInquiry from '../models/MaterialInquiry';
+import RFQ from '../models/RFQ';
+import Order from '../models/Order';
+import Supplier from '../models/Supplier';
 import { Types } from 'mongoose';
 
 // Auto Reply Controllers
@@ -148,10 +152,7 @@ export const getLeads = async (req: any, res: Response) => {
   try {
     const supplierId = req.supplier?.id || req.admin?.supplierId;
     if (!supplierId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
     const { status, scoreMin, scoreMax } = req.query;
@@ -164,17 +165,81 @@ export const getLeads = async (req: any, res: Response) => {
       if (scoreMax) filter.score.$lte = parseInt(scoreMax);
     }
 
-    const leads = await Lead.find(filter).sort({ score: -1, createdAt: -1 });
-    
+    // 1. Direct leads assigned to this supplier
+    const directLeads = await Lead.find(filter).sort({ score: -1, createdAt: -1 });
+
+    // 2. If supplier is approved, also pull MI + RFQ by category
+    const supplier = await Supplier.findById(supplierId).select('productsOffered status');
+    const mergedLeads: any[] = [...directLeads];
+
+    if (supplier?.status === 'approved' && (supplier.productsOffered || []).length > 0) {
+      const supplierCategories: string[] = (supplier.productsOffered || []).map((p: string) => p.toLowerCase());
+      const categoryPatterns = supplierCategories.map((c: string) => new RegExp(c.replace(/[-/]/g, '.'), 'i'));
+
+      // Material Inquiries matching category
+      const miDocs = await MaterialInquiry.find({
+        'materials.category': { $in: categoryPatterns }
+      }).sort({ createdAt: -1 }).limit(100);
+
+      for (const mi of miDocs) {
+        const firstMat = (mi as any).materials?.[0];
+        const budgetRaw = (mi as any).estimatedBudget || (mi as any).budget || 0;
+        const budget = typeof budgetRaw === 'string'
+          ? parseFloat(budgetRaw.replace(/[^0-9.]/g, '')) || 0
+          : (budgetRaw || 0);
+        const score = budget > 500000 ? 88 : budget > 100000 ? 72 : budget > 50000 ? 60 : 45;
+        mergedLeads.push({
+          _id: mi._id,
+          company: (mi as any).companyName || 'Unknown Buyer',
+          email: '(Protected by RitzYard)',
+          phone: undefined,
+          score,
+          potential: budget,
+          status: 'new',
+          productInterest: firstMat?.name || firstMat?.category || 'Material Inquiry',
+          inquiryCount: (mi as any).materials?.length || 1,
+          sourceType: 'material_inquiry',
+          inquiryNumber: (mi as any).inquiryNumber,
+          createdAt: (mi as any).createdAt,
+        });
+      }
+
+      // RFQs matching product category
+      const rfqDocs = await RFQ.find({
+        productCategory: { $in: categoryPatterns }
+      }).sort({ createdAt: -1 }).limit(100);
+
+      for (const rfq of rfqDocs) {
+        const qty = (rfq as any).quantity || 0;
+        const baseVal = qty * 1000;
+        const score = baseVal > 500000 ? 85 : baseVal > 100000 ? 70 : 50;
+        mergedLeads.push({
+          _id: rfq._id,
+          company: (rfq as any).companyName || 'Unknown Buyer',
+          email: '(Protected by RitzYard)',
+          phone: undefined,
+          score,
+          potential: baseVal,
+          status: 'new',
+          productInterest: (rfq as any).productName || (rfq as any).productCategory || 'RFQ',
+          inquiryCount: 1,
+          sourceType: 'rfq',
+          inquiryNumber: (rfq as any).inquiryNumber,
+          createdAt: (rfq as any).createdAt,
+        });
+      }
+    }
+
+    // Sort merged by score desc then date desc
+    mergedLeads.sort((a, b) => (b.score - a.score) || (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+
     res.json({
       success: true,
-      data: leads
+      leads: mergedLeads,
+      data: mergedLeads,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch leads'
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch leads' });
   }
 };
 
@@ -221,28 +286,57 @@ export const getOrders = async (req: any, res: Response) => {
   try {
     const supplierId = req.supplier?.id || req.admin?.supplierId;
     if (!supplierId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
     const { status } = req.query;
     const filter: any = { supplierId };
-
     if (status) filter.status = status;
 
-    const orders = await OrderAutomation.find(filter).sort({ createdAt: -1 });
-    
+    // 1. OrderAutomation collection (legacy/automation-specific)
+    const automationOrders = await OrderAutomation.find(filter).sort({ createdAt: -1 });
+
+    // 2. Real Order model (admin-created orders linked to this supplier)
+    const realOrderFilter: any = { supplierId };
+    if (status) realOrderFilter.status = status;
+    const realOrders = await Order.find(realOrderFilter).sort({ createdAt: -1 });
+
+    // Normalize real orders to match the Order interface on the frontend
+    const normalizedReal = realOrders.map((o: any) => ({
+      _id: o._id,
+      orderNumber: o._id.toString().slice(-6).toUpperCase(),
+      customerName: o.customerName,
+      buyerName: o.customerName,
+      productName: o.productName,
+      totalAmount: o.totalAmount,
+      amount: o.totalAmount,
+      status: o.status,
+      paymentStatus: o.paymentStatus,
+      quantity: o.quantity,
+      unit: o.unit,
+      createdAt: o.createdAt,
+      source: 'order',
+    }));
+
+    // Merge and sort newest first, deduplicate by _id string
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const o of [...automationOrders, ...normalizedReal]) {
+      const key = o._id.toString();
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(o);
+      }
+    }
+    merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     res.json({
       success: true,
-      data: orders
+      orders: merged,
+      data: merged,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch orders'
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch orders' });
   }
 };
 
@@ -370,38 +464,67 @@ export const getPerformanceAnalytics = async (req: any, res: Response) => {
 
 export const getAutomationStats = async (req: any, res: Response) => {
   try {
+    const isAdmin = !!req.admin;
     const supplierId = req.supplier?.id || req.admin?.supplierId;
-    if (!supplierId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
+
+    // If called by admin panel (no supplierId), return global counts across all suppliers
+    let autoReplyCount: number;
+    let leadCount: number;
+    let orderCount: number;
+    let activeAutoReplies: number;
+    let qualifiedLeads: number;
+    let processedOrders: number;
+    let realOrderCount: number;
+    let productCount: number;
+    let inventoryCount: number;
+
+    if (isAdmin && !supplierId) {
+      // Global admin: aggregate across all
+      autoReplyCount = await AutoReply.countDocuments({});
+      leadCount = await Lead.countDocuments({});
+      orderCount = await OrderAutomation.countDocuments({});
+      activeAutoReplies = await AutoReply.countDocuments({ isActive: true });
+      qualifiedLeads = await Lead.countDocuments({ status: 'qualified' });
+      processedOrders = await OrderAutomation.countDocuments({ status: { $in: ['shipped', 'delivered'] } });
+      realOrderCount = await Order.countDocuments({});
+      productCount = await Product.countDocuments({});
+      inventoryCount = await Product.countDocuments({ stock: { $gt: 0 } });
+    } else if (supplierId) {
+      autoReplyCount = await AutoReply.countDocuments({ supplierId });
+      leadCount = await Lead.countDocuments({ supplierId });
+      orderCount = await OrderAutomation.countDocuments({ supplierId });
+      activeAutoReplies = await AutoReply.countDocuments({ supplierId, isActive: true });
+      qualifiedLeads = await Lead.countDocuments({ supplierId, status: 'qualified' });
+      processedOrders = await OrderAutomation.countDocuments({ supplierId, status: { $in: ['shipped', 'delivered'] } });
+      realOrderCount = await Order.countDocuments({ supplierId });
+      productCount = await Product.countDocuments({ supplierId });
+      inventoryCount = await Product.countDocuments({ supplierId, stock: { $gt: 0 } });
+    } else {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Get counts
-    const autoReplyCount = await AutoReply.countDocuments({ supplierId });
-    const leadCount = await Lead.countDocuments({ supplierId });
-    const orderCount = await OrderAutomation.countDocuments({ supplierId });
-    
-    // Get active items
-    const activeAutoReplies = await AutoReply.countDocuments({ supplierId, isActive: true });
-    const qualifiedLeads = await Lead.countDocuments({ supplierId, status: 'qualified' });
-    const processedOrders = await OrderAutomation.countDocuments({ supplierId, status: { $in: ['shipped', 'delivered'] } });
+    const totalOrders = orderCount + realOrderCount;
 
     res.json({
       success: true,
       data: {
-        autoReplies: {
-          total: autoReplyCount,
-          active: activeAutoReplies
-        },
-        leads: {
-          total: leadCount,
-          qualified: qualifiedLeads
-        },
-        orders: {
-          total: orderCount,
-          processed: processedOrders
+        // flat keys for frontend (BusinessAutomationSuite)
+        autoReplies: autoReplyCount,
+        leadScores: leadCount,
+        ordersProcessed: totalOrders,
+        emailsSent: activeAutoReplies,
+        responseTime: autoReplyCount > 0 ? '<1hr' : '--',
+        conversionRate: leadCount > 0 ? `${Math.round((qualifiedLeads / leadCount) * 100)}%` : '0%',
+        // detailed nested
+        totalAutoReplies: autoReplyCount,
+        totalLeads: leadCount,
+        totalOrders: totalOrders,
+        productCount,
+        inventoryCount,
+        stats: {
+          autoReplies: { total: autoReplyCount, active: activeAutoReplies },
+          leads: { total: leadCount, qualified: qualifiedLeads },
+          orders: { total: totalOrders, processed: processedOrders },
         }
       }
     });
@@ -410,6 +533,78 @@ export const getAutomationStats = async (req: any, res: Response) => {
       success: false,
       message: 'Failed to fetch automation stats'
     });
+  }
+};
+
+// Admin: Smart Inventory stats
+export const getAdminInventoryStats = async (req: any, res: Response) => {
+  try {
+    const totalProducts = await Product.countDocuments({});
+    const inStock = await Product.countDocuments({ stock: { $gt: 0 } });
+    const lowStock = await Product.countDocuments({ stock: { $gt: 0, $lte: 10 } });
+    const outOfStock = await Product.countDocuments({ stock: 0 });
+    const approvedProducts = await Product.countDocuments({ status: 'approved' });
+
+    res.json({
+      success: true,
+      data: {
+        totalProducts,
+        inStock,
+        lowStock,
+        outOfStock,
+        approvedProducts,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch inventory stats' });
+  }
+};
+
+// Admin: Price Optimizer stats
+export const getAdminPricingStats = async (req: any, res: Response) => {
+  try {
+    const totalProducts = await Product.countDocuments({});
+    const pricedProducts = await Product.countDocuments({ price: { $gt: 0 } });
+    const suppliersWithProducts = await Product.distinct('supplierId');
+
+    res.json({
+      success: true,
+      data: {
+        totalProducts,
+        pricedProducts,
+        suppliersCount: suppliersWithProducts.length,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch pricing stats' });
+  }
+};
+
+// Admin: System Health
+export const getSystemHealth = async (req: any, res: Response) => {
+  try {
+    const totalOrders = await Order.countDocuments({});
+    const pendingOrders = await Order.countDocuments({ status: 'pending' });
+    const totalLeads = await Lead.countDocuments({});
+    const totalAutoReplies = await AutoReply.countDocuments({});
+    const activeAutoReplies = await AutoReply.countDocuments({ isActive: true });
+    const totalSuppliers = await Supplier.countDocuments({});
+    const approvedSuppliers = await Supplier.countDocuments({ status: 'approved' });
+
+    res.json({
+      success: true,
+      data: {
+        totalOrders,
+        pendingOrders,
+        totalLeads,
+        totalAutoReplies,
+        activeAutoReplies,
+        totalSuppliers,
+        approvedSuppliers,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch system health' });
   }
 };
 

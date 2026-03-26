@@ -34,6 +34,8 @@ import paymentRoutes from './routes/payment';
 import logisticsRoutes from './routes/logistics';
 import inventoryRoutes from './routes/inventory';
 import orderRoutes from './routes/order';
+import chatRoutes from './routes/chat';
+import buyerRoutes from './routes/buyer';
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
@@ -145,6 +147,8 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/logistics', logisticsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/buyer', buyerRoutes);
 
 // Serve static HTML forms for GDPR compliance
 app.use('/privacy', express.static(path.join(__dirname, 'public')));

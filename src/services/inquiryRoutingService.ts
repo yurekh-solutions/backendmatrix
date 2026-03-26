@@ -185,13 +185,16 @@ export async function createLeadsForSuppliers(
       const lead = new Lead({
         supplierId: supplier.supplierId,
         name: inquiry.customerName,
-        email: inquiry.email,
-        phone: inquiry.phone,
+        // Buyer email masked — supplier contacts via RitzYard chat only
+        email: '(Protected by RitzYard)',
+        phone: 'Contact via RitzYard Chat',
         company: inquiry.companyName || 'Individual',
         message: `[Inquiry #${inquiry.inquiryNumber}] Looking for: ${materialsList}. Delivery: ${inquiry.deliveryLocation}`,
         source: 'website',
         score,
         status: 'new',
+        // Store inquiryNumber in inquiryRef for chat linking
+        inquiryRef: inquiry.inquiryNumber,
         tags: [
           ...supplier.matchedCategories.slice(0, 3),
           inquiry.totalEstimatedValue && inquiry.totalEstimatedValue > 500000 ? 'high-value' : 'standard'

@@ -7,6 +7,7 @@ const router = express.Router();
 // Public routes
 router.post('/', materialInquiryController.submitMaterialInquiry);
 router.get('/customer', materialInquiryController.getCustomerInquiries);
+router.get('/track', materialInquiryController.trackInquiry); // Buyer tracking by email+inquiryNumber
 router.get('/admin/all', materialInquiryController.getAllMaterialInquiries); // No auth for development
 
 // Admin routes (protected)
