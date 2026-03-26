@@ -95,10 +95,14 @@ const RFQSchema = new Schema<IRFQ>(
 RFQSchema.pre('save', async function (next) {
   if (this.isNew && !this.inquiryNumber) {
     const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
+    const year  = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const count = await mongoose.model('RFQ').countDocuments();
-    this.inquiryNumber = `RFQ${year}${month}${(count + 1).toString().padStart(5, '0')}`;
+    const day   = now.getDate().toString().padStart(2, '0');
+    // Use timestamp millis + random 3-digit suffix for uniqueness
+    // even when multiple items are saved in parallel (Promise.all)
+    const ts     = Date.now().toString().slice(-5);          // last 5 digits of ms timestamp
+    const rand   = Math.floor(Math.random() * 900 + 100);    // 100-999 random
+    this.inquiryNumber = `RFQ${year}${month}${day}${ts}${rand}`;
   }
   next();
 });
