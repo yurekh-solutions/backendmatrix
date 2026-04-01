@@ -181,17 +181,17 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   });
 });
 
-// Start server (only in non-serverless / local dev)
+// Start server
 const startServer = async () => {
   try {
+    // Connect to database
     await connectDB();
+    
+    // Create default admin
     await createDefaultAdmin();
-
-    // Only call app.listen in local / traditional hosting
-    // Vercel exports the app directly (no listen needed)
-    if (process.env.VERCEL !== '1') {
-      app.listen(PORT, () => {
-        console.log(`
+    
+    app.listen(PORT, () => {
+      console.log(`
 ╔════════════════════════════════════════════╗
 ║   🚀 Supplier Onboarding API Server       ║
 ║   Port: ${PORT}                            ║
@@ -199,14 +199,10 @@ const startServer = async () => {
 ║   Database: Connected                      ║
 ╚════════════════════════════════════════════╝
       `);
-      });
-    } else {
-      // On Vercel: just connect DB + admin, no listen
-      console.log('✅ Vercel serverless: DB connected');
-    }
+    });
   } catch (error) {
     console.error('Failed to start server:', error);
-    if (process.env.VERCEL !== '1') process.exit(1);
+    process.exit(1);
   }
 };
 
