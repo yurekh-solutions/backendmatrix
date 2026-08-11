@@ -135,7 +135,7 @@ async function main() {
   await testBackend('Local Backend', 'http://localhost:5000/api');
   
   // Test production (Render)
-  await testBackend('Production (Render)', 'https://backendmatrix.onrender.com/api');
+  await testBackend('Production (Render)', 'https://backendmatrix-cox3.onrender.com/api');
 
   console.log('\n\n╔════════════════════════════════════════════╗');
   console.log('║           Summary & Recommendations        ║');

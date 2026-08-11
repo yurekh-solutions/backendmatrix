@@ -8,4 +8,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: API_URL
-        value: https://backendmatrix.onrender.com
+        value: https://backendmatrix-cox3.onrender.com

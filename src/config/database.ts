@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 // Connection retry settings
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 5000; // 5 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 3000; // 3 seconds
 
 export const connectDB = async (retries = MAX_RETRIES): Promise<void> => {
   try {
@@ -10,8 +10,8 @@ export const connectDB = async (retries = MAX_RETRIES): Promise<void> => {
     
     // Mongoose 8.x connection with proper options
     await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 30000, // 30 seconds timeout
-      socketTimeoutMS: 45000, // 45 seconds socket timeout
+      serverSelectionTimeoutMS: 15000, // 15 seconds timeout
+      socketTimeoutMS: 30000, // 30 seconds socket timeout
       maxPoolSize: 10, // Maximum connection pool size
       minPoolSize: 2, // Minimum connection pool size
       maxIdleTimeMS: 30000, // Close idle connections after 30 seconds

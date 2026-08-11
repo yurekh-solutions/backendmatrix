@@ -181,28 +181,32 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   });
 });
 
-// Start server
+// Start server - Listen immediately for health checks, then connect DB
 const startServer = async () => {
+  // Start HTTP server FIRST so Render health checks succeed during cold start
+  app.listen(PORT, () => {
+    console.log(`
+╔════════════════════════════════════════════╗
+║   🚀 Supplier Onboarding API Server       ║
+║   Port: ${PORT}                            ║
+║   Environment: ${process.env.NODE_ENV || 'development'}              ║
+║   Status: Listening (DB connecting...)     ║
+╚════════════════════════════════════════════╝
+      `);
+  });
+
   try {
-    // Connect to database
+    // Connect to database after server is listening
     await connectDB();
     
     // Create default admin
     await createDefaultAdmin();
     
-    app.listen(PORT, () => {
-      console.log(`
-╔════════════════════════════════════════════╗
-║   🚀 Supplier Onboarding API Server       ║
-║   Port: ${PORT}                            ║
-║   Environment: ${process.env.NODE_ENV || 'development'}              ║
-║   Database: Connected                      ║
-╚════════════════════════════════════════════╝
-      `);
-    });
+    console.log('✅ Server fully initialized - Database connected and admin ready');
   } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
+    console.error('Failed to initialize database:', error);
+    // Server keeps running even if DB fails - health check will still respond
+    // but API routes will return errors until DB connects
   }
 };
 
