@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 
 // Load environment variables FIRST before any other imports
 const dotenvResult = dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -13,6 +14,7 @@ if (dotenvResult.error) {
 import { connectDB } from './config/database';
 import { createDefaultAdmin } from './controllers/authController';
 import cloudinary from './config/cloudinary'; // Initialize Cloudinary with env vars
+import { initSocket } from './sockets/chatSocket'; // Step 2: Socket.IO server
 
 // Routes
 import authRoutes from './routes/auth';
@@ -183,8 +185,11 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 
 // Start server - Listen immediately for health checks, then connect DB
 const startServer = async () => {
+  // Step 2: Create HTTP server explicitly so Socket.IO can attach
+  const httpServer = http.createServer(app);
+
   // Start HTTP server FIRST so Render health checks succeed during cold start
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗
 ║   🚀 Supplier Onboarding API Server       ║
@@ -192,8 +197,16 @@ const startServer = async () => {
 ║   Environment: ${process.env.NODE_ENV || 'development'}              ║
 ║   Status: Listening (DB connecting...)     ║
 ╚════════════════════════════════════════════╝
-      `);
+    `);
   });
+
+  // Step 2: Initialize Socket.IO after HTTP server is up
+  try {
+    initSocket(httpServer);
+  } catch (err: any) {
+    console.error('⚠️  Socket.IO failed to initialize:', err.message);
+    // Server keeps running even if WebSocket fails -- REST API still works
+  }
 
   try {
     // Connect to database after server is listening

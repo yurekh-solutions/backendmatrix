@@ -184,10 +184,10 @@ router.get('/milo/find-suppliers', async (req: any, res) => {
     }).populate('supplierId', 'companyName email phone businessType yearsInBusiness');
     
     // Filter by budget if provided
-    let filteredProducts = products;
+    let filteredProducts: any[] = products;
     if (budget) {
-      const maxBudget = parseInt(budget);
-      filteredProducts = products.filter(p => (p.price?.amount || 0) <= maxBudget);
+      const maxBudget = parseInt(budget as string);
+      filteredProducts = (products as any[]).filter((p: any) => (p.price?.amount || 0) <= maxBudget);
     }
     
     // Score suppliers based on product availability and price competitiveness

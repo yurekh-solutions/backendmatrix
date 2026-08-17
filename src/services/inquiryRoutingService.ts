@@ -13,6 +13,7 @@ import Supplier from '../models/Supplier';
 import Product from '../models/Product';
 import Lead from '../models/Lead';
 import { generateWhatsAppWebURL } from '../utils/whatsappService';
+import { emitNewLead } from '../sockets/chatSocket';
 import mongoose from 'mongoose';
 
 interface MaterialItem {
@@ -204,6 +205,42 @@ export async function createLeadsForSuppliers(
       await lead.save();
       createdLeads.push(supplier.supplierId.toString());
       console.log(`✅ Created lead for ${supplier.companyName} (Score: ${score})`);
+
+      // Step 1: Generate wa.me URL for this supplier + inquiry, save to lead
+      try {
+        let phone = (supplier.phone || '').replace(/\D/g, '');
+        if (phone && !phone.startsWith('91') && phone.length === 10) {
+          phone = '91' + phone;
+        }
+        if (phone) {
+          const waMessage = `🔔 *New Inquiry from RitzYard*\n\nInquiry #${inquiry.inquiryNumber}\n\n${inquiry.materials.map((m, i) => `${i + 1}. ${m.materialName} — ${m.quantity} ${m.unit}`).join('\n')}\n\nDelivery: ${inquiry.deliveryLocation}${inquiry.totalEstimatedValue ? `\n\nEstimated value: ₹${inquiry.totalEstimatedValue.toLocaleString('en-IN')}` : ''}\n\nReply with your best quote.`;
+          lead.whatsappUrl = generateWhatsAppWebURL(phone, waMessage);
+          lead.notifiedAt = new Date();
+        }
+      } catch (waErr: any) {
+        console.warn(`⚠️  Could not build wa.me URL for ${supplier.companyName}:`, waErr.message);
+      }
+
+      await lead.save();
+
+      // Step 2: Emit lead:new event to this supplier via WebSocket (real-time dashboard alert)
+      try {
+        emitNewLead(supplier.supplierId.toString(), {
+          leadId: lead._id.toString(),
+          inquiryNumber: inquiry.inquiryNumber,
+          customerName: inquiry.customerName, // already masked in UI as "Verified Buyer"
+          deliveryLocation: inquiry.deliveryLocation,
+          materials: inquiry.materials.map(m => ({ materialName: m.materialName, quantity: m.quantity, unit: m.unit })),
+          matchedCategories: supplier.matchedCategories,
+          score,
+          estimatedValue: inquiry.totalEstimatedValue,
+          whatsappUrl: lead.whatsappUrl,
+          createdAt: (lead as any).createdAt?.toISOString?.() || new Date().toISOString()
+        });
+      } catch (wsErr: any) {
+        // WebSocket emit is best-effort; never fail lead creation if it errors
+        console.warn(`⚠️  Could not emit lead:new for ${supplier.companyName}:`, wsErr.message);
+      }
 
     } catch (error: any) {
       console.error(`❌ Failed to create lead for ${supplier.companyName}:`, error.message);

@@ -16,6 +16,12 @@ export interface ILead extends Document {
   quoteMessage?: string;
   quoteStatus?: 'pending_admin' | 'approved' | 'rejected';
   inquiryRef?: string; // inquiry number for tracking
+  // Step 1+2 additions: notification + delivery tracking (no SMTP, in-app + wa.me only)
+  whatsappUrl?: string; // pre-filled wa.me link for this supplier
+  viewedAt?: Date; // when supplier first opened the lead
+  quoteSubmittedAt?: Date; // when supplier submitted quote
+  matchKeywords?: string[]; // keywords that matched (for transparency)
+  notifiedAt?: Date; // when lead was queued for notification
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +81,22 @@ const leadSchema = new Schema<ILead>({
   },
   inquiryRef: {
     type: String
+  },
+  // Step 1+2 additions: in-app + wa.me delivery (no SMTP)
+  whatsappUrl: {
+    type: String
+  },
+  viewedAt: {
+    type: Date
+  },
+  quoteSubmittedAt: {
+    type: Date
+  },
+  matchKeywords: [{
+    type: String
+  }],
+  notifiedAt: {
+    type: Date
   }
 }, {
   timestamps: true
@@ -83,5 +105,6 @@ const leadSchema = new Schema<ILead>({
 // Index for faster queries
 leadSchema.index({ supplierId: 1, status: 1 });
 leadSchema.index({ score: -1 }); // High score leads first
+leadSchema.index({ notifiedAt: -1 }); // Recently notified leads
 
 export default mongoose.model<ILead>('Lead', leadSchema);

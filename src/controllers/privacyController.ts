@@ -138,7 +138,7 @@ export const getDeletionRequests = async (req: Request, res: Response) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [requests, total] = await Promise.all([
-      DeletionRequest.find(filter)
+      (DeletionRequest.find(filter as any) as any)
         .sort({ submittedAt: -1 })
         .skip(skip)
         .limit(Number(limit))
