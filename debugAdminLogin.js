@@ -11,7 +11,7 @@ const https = require('https');
 require('dotenv').config();
 
 const ADMIN_EMAIL = 'admin@matrixyuvraj.com';
-const ADMIN_PASSWORD = 'Admin@123';
+const ADMIN_PASSWORD = 'Yuvraj@2706';
 
 console.log('\n╔════════════════════════════════════════════╗');
 console.log('║    Complete Admin Login Debug Tool        ║');

@@ -13,7 +13,7 @@ const bcrypt = require('bcryptjs');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://MaterialMatrix:Sonia2706@cluster0.nghmt5w.mongodb.net/supplier-onboarding?retryWrites=true&w=majority&appName=Cluster0';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@matrixyuvraj.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Yuvraj@2706';
 
 console.log('\n╔════════════════════════════════════════════╗');
 console.log('║      Admin Account Check & Reset Tool     ║');

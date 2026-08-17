@@ -3,12 +3,16 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string;
+  googleId?: string;
   phone?: string;
   company?: string;
   profileImage?: string;
   businessImage?: string;
   role: 'buyer' | 'guest';
+  authProvider?: 'local' | 'google';
+  passwordResetToken?: string;
+  passwordResetTokenExpiry?: Date;
   cart: {
     productId: mongoose.Types.ObjectId;
     quantity: number;
@@ -35,7 +39,18 @@ const UserSchema = new Schema<IUser>(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
+      select: false,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
     },
     phone: {
       type: String,
@@ -78,6 +93,14 @@ const UserSchema = new Schema<IUser>(
         ref: 'RFQ',
       },
     ],
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetTokenExpiry: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true }
 );

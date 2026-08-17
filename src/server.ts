@@ -97,6 +97,17 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Required for Google OAuth popup: allow the auth popup window to postMessage
+// back to the parent. Without this, "Cross-Origin-Opener-Policy would block
+// the window.postMessage call" errors break Google sign-in.
+// `unsafe-none` is the most permissive setting and works for all OAuth flows.
+app.use((_req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
+
 // Serve uploaded files statically with proper MIME types
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
   setHeaders: (res, filePath) => {
