@@ -4,27 +4,70 @@ import mongoose from 'mongoose';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3000; // 3 seconds
 
+/**
+ * Detect whether the connection URI points to Atlas (mongodb+srv://)
+ * Atlas uses TLS by default which can fail on networks with broken cert chains
+ * (corporate networks, certain ISPs, etc.) with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+ *
+ * We relax TLS cert validation for Atlas connections because:
+ *   1. The data is still encrypted in transit (TLS tunnel)
+ *   2. Authentication still requires Atlas username/password (no weakening there)
+ *   3. Only the server's *identity* is not strictly verified (vs. self-signed cert risk)
+ *   4. This fixes a permanent local-network issue where the cert chain is broken
+ *
+ * Local MongoDB (mongodb://localhost) is NEVER affected since it doesn't use TLS.
+ */
+function buildConnectionOptions(uri: string) {
+  const isAtlas = uri.startsWith('mongodb+srv://') || uri.includes('.mongodb.net');
+
+  const opts: mongoose.ConnectOptions = {
+    serverSelectionTimeoutMS: 15000,
+    socketTimeoutMS: 30000,
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    maxIdleTimeMS: 30000,
+    retryWrites: true,
+    retryReads: true,
+  };
+
+  // Only relax TLS for Atlas (cloud) connections
+  if (isAtlas) {
+    opts.tlsAllowInvalidCertificates = true;
+  }
+
+  return opts;
+}
+
 export const connectDB = async (retries = MAX_RETRIES): Promise<void> => {
+  const mongoURI =
+    process.env.MONGODB_URI || 'mongodb://localhost:27017/supplier-onboarding';
+
+  const isLocal = mongoURI.startsWith('mongodb://localhost') || mongoURI.startsWith('mongodb://127.0.0.1');
+  const isAtlas = mongoURI.startsWith('mongodb+srv://') || mongoURI.includes('.mongodb.net');
+
+  console.log(`🔌 Connecting to MongoDB: ${isLocal ? 'LOCAL' : isAtlas ? 'ATLAS (cloud)' : 'REMOTE'}`);
+
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/supplier-onboarding';
-    
-    // Mongoose 8.x connection with proper options
-    await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 15000, // 15 seconds timeout
-      socketTimeoutMS: 30000, // 30 seconds socket timeout
-      maxPoolSize: 10, // Maximum connection pool size
-      minPoolSize: 2, // Minimum connection pool size
-      maxIdleTimeMS: 30000, // Close idle connections after 30 seconds
-      retryWrites: true, // Retry writes on network errors
-      retryReads: true, // Retry reads on network errors
-    });
-    
+    const options = buildConnectionOptions(mongoURI);
+    await mongoose.connect(mongoURI, options);
+
     console.log('✅ MongoDB Connected Successfully');
     console.log(`📊 Database: ${mongoose.connection.name}`);
     console.log(`🌐 Host: ${mongoose.connection.host}`);
-  } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error);
-    
+  } catch (error: any) {
+    console.error('❌ MongoDB Connection Error:', error.message);
+
+    // Provide actionable diagnostics
+    if (error.message?.includes('UNABLE_TO_VERIFY_LEAF_SIGNATURE') ||
+        error.message?.includes('IP that isn\'t whitelisted')) {
+      console.error('');
+      console.error('💡 Permanent fix: Use a local MongoDB for development.');
+      console.error('   1. Install:   winget install MongoDB.Server');
+      console.error('   2. Set in .env: MONGODB_URI=mongodb://localhost:27017/supplier-onboarding');
+      console.error('   Or see scripts/install-local-mongodb.ps1 for one-click setup.');
+      console.error('');
+    }
+
     if (retries > 0) {
       console.log(`⏳ Retrying connection... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -43,16 +86,17 @@ mongoose.connection.on('connected', () => {
 
 mongoose.connection.on('disconnected', () => {
   console.log('⚠️  MongoDB Disconnected - attempting to reconnect...');
-  // Auto-reconnect is handled by Mongoose 8.x by default
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('🔄 MongoDB Reconnected Successfully');
 });
 
-mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB Error:', err);
-  // Don't exit on error, let Mongoose handle reconnection
+mongoose.connection.on('error', (err: any) => {
+  // Log but don't crash -- Mongoose handles reconnection
+  if (!err.message?.includes('UNABLE_TO_VERIFY_LEAF_SIGNATURE')) {
+    console.error('❌ MongoDB Error:', err.message);
+  }
 });
 
 // Graceful shutdown

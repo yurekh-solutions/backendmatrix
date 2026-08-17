@@ -4,3 +4,4 @@ dist
 uploads/*
 !uploads/.gitkeep
 *.log\"commit_msg.txt\"  
+\"commit_msg.txt\"  
