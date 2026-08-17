@@ -308,6 +308,8 @@ export const getSupplierInquiries = async (req: any, res: Response) => {
         status: inquiry.status === 'new' ? 'new' : inquiry.status === 'contacted' ? 'responded' : inquiry.status === 'qualified' ? 'quoted' : 'converted',
         score: inquiry.score || 50,
         tags: inquiry.tags || [],
+        // Step 1: Pre-filled wa.me link for the supplier to open WhatsApp on their phone
+        whatsappUrl: inquiry.whatsappUrl || null,
         createdAt: inquiry.createdAt,
         updatedAt: inquiry.updatedAt
       };
