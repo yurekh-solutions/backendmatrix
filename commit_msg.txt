@@ -1,7 +1,0 @@
-Return whatsappUrl in supplier inquiry response
-
-Previously the lead.whatsappUrl was saved to DB on creation but the
-getSupplierInquiries endpoint never returned it. The frontend now
-needs it to render the Open in WhatsApp button on each lead card.
-
-Added one line: whatsappUrl: inquiry.whatsappUrl || null
